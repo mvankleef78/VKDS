@@ -19,6 +19,13 @@ A library of 30 cinematic website modules. Each is a standalone single-file HTML
 - A browser (for previewing)
 - That's it. No npm, no build, no frameworks.
 
+## Memory Layer
+
+This project uses [byterover-cli](https://github.com/campfirein/byterover-cli) (`brv`) for persistent agent memory.
+
+Install: `npm install -g byterover-cli`
+Setup: `brv login && brv init`
+
 ## Attribution
 
 Created by Jay from RoboLabs. Learn more at [RoboNuggets](https://robonuggets.com)
