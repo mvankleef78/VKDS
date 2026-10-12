@@ -21,7 +21,7 @@
     skip(wire) {
       if (wire === 0) this.varint();
       else if (wire === 1) this.p += 8;
-      else if (wire === 2) this.p += this.varint();
+      else if (wire === 2) { const len = this.varint(); this.p += len; } // read len first: `p += varint()` would use the old p
       else if (wire === 5) this.p += 4;
       else throw new Error('Unsupported protobuf wire type ' + wire);
     }
