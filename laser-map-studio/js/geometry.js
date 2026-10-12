@@ -392,6 +392,40 @@
     return false;
   }
 
+  /* Union many polygons in balanced batches: faster and more robust than one huge call. */
+  G.unionMany = function (polys) {
+    if (polys.length <= 400) return G.union(polys);
+    const mid = polys.length >> 1;
+    return G.union(G.unionMany(polys.slice(0, mid)).concat(G.unionMany(polys.slice(mid))));
+  };
+
+  /* Thicken polylines into one outline: items [{ pts, w }] with w the full width in mm.
+     Each segment becomes a rectangle and each vertex a disc (round joins and caps). */
+  G.bufferLines = function (items) {
+    const pieces = [];
+    const disc = (c, r) => {
+      const out = [];
+      for (let i = 0; i < 12; i++) {
+        const a = ((i + 0.5) / 12) * Math.PI * 2;
+        out.push([c[0] + r * Math.cos(a), c[1] + r * Math.sin(a)]);
+      }
+      return [out];
+    };
+    for (const { pts, w } of items) {
+      const r = w / 2;
+      if (pts.length < 2 || !(r > 0)) continue;
+      for (let i = 0; i < pts.length - 1; i++) {
+        const p = pts[i], q = pts[i + 1];
+        const dx = q[0] - p[0], dy = q[1] - p[1], len = Math.hypot(dx, dy);
+        if (len < 1e-6) continue;
+        const nx = (-dy / len) * r, ny = (dx / len) * r;
+        pieces.push([[[p[0] + nx, p[1] + ny], [q[0] + nx, q[1] + ny], [q[0] - nx, q[1] - ny], [p[0] - nx, p[1] - ny]]]);
+      }
+      for (const p of pts) pieces.push(disc(p, r));
+    }
+    return G.unionMany(pieces);
+  };
+
   /* Shrink a multipolygon by `b` (also widens holes): subtract a buffer around every edge. */
   G.inset = function (geom, b) {
     if (!(b > 0)) return geom;

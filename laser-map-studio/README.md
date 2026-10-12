@@ -20,6 +20,7 @@ Open `index.html` (or host the folder on GitHub Pages / any static host). No bui
 | 2 | Land plate | Outline + water cut out; streets, rivers, parks, (buildings) engraved; railways scored |
 | 3 | Buildings | Building footprints cut as raised pieces (optional) |
 | 4 | Frame | Raised border ring (optional, needs border > 0) |
+| 4 | Raised roads + frame | Instead of the plain frame when **Main roads → Raised** is chosen: the main roads as a cut-out network joined to the frame, so it is one piece (stain it dark and glue it on top) |
 
 Laser colour convention, all units in mm: **red `#FF0000` 0.1 mm = cut**, **blue `#0000FF` 0.1 mm = score**, **black = raster engrave**.
 

@@ -60,6 +60,10 @@
           <select id="roads"><option value="engrave">Engrave</option><option value="score">Score line</option><option value="off">Off</option></select>
         </div>
         <div class="feature">
+          <span>Main roads</span>
+          <select id="raisedRoads"><option value="off">Like other streets</option><option value="major">Raised: highways + primary</option><option value="secondary">Raised: + secondary</option><option value="tertiary">Raised: + tertiary</option></select>
+        </div>
+        <div class="feature">
           <span>Street detail</span>
           <select id="detail"><option value="auto">Auto</option><option value="major">Major roads</option><option value="medium">+ Local streets</option><option value="all">Everything</option></select>
         </div>
@@ -86,6 +90,7 @@
         <summary>Advanced</summary>
         <div class="row">
           <label>Line weight<input id="roadScale" type="number" min="0.2" max="4" step="0.1" value="1"></label>
+          <label>Raised road width<input id="raisedScale" type="number" min="0.4" max="3" step="0.1" value="1"></label>
           <label>Smoothing <span class="unit">mm</span><input id="simplify" type="number" min="0" max="2" step="0.05" value="0.1"></label>
         </div>
         <div class="row">

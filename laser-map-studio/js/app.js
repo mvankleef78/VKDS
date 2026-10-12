@@ -15,7 +15,7 @@
 
   /* ---------- settings ---------- */
 
-  const FIELDS = ['width', 'height', 'border', 'water', 'roads', 'detail', 'waterways', 'rails', 'parks', 'buildings',
+  const FIELDS = ['width', 'height', 'border', 'water', 'roads', 'raisedRoads', 'raisedScale', 'detail', 'waterways', 'rails', 'parks', 'buildings',
     'roadScale', 'simplify', 'minArea', 'minBuilding', 'theme'];
   const CHECKS = ['frameLayer', 'engraveWaterOnBase'];
 
@@ -29,6 +29,8 @@
       frameLayer: $('frameLayer').checked,
       water: $('water').value,
       roads: $('roads').value,
+      raisedRoads: $('raisedRoads').value,
+      raisedScale: Math.max(0.2, num('raisedScale', 1)),
       detail: $('detail').value,
       waterways: $('waterways').value,
       rails: $('rails').value,
@@ -382,7 +384,8 @@
     const s = readSettings();
     const { w, h, o } = areaKm2();
     const km2 = w * h;
-    const detail = s.detail === 'auto' ? autoDetail(km2) : s.detail;
+    let detail = s.detail === 'auto' ? autoDetail(km2) : s.detail;
+    if (s.raisedRoads === 'tertiary' && detail === 'major') detail = 'medium'; // tertiary roads must be downloaded
 
     if (km2 > 20000) {
       setStatus('This area is very large. Zoom in a bit (max ≈ 140 × 140 km) – OpenStreetMap servers will refuse bigger requests.', 'error');
@@ -414,7 +417,7 @@
       const bbox = { s: Math.max(-85, se.lat), w: Math.max(-180, nw.lng), n: Math.min(85, nw.lat), e: Math.min(180, se.lng) };
 
       const feat = {
-        water: s.water !== 'off', waterways: s.waterways !== 'off', roads: s.roads !== 'off', detail,
+        water: s.water !== 'off', waterways: s.waterways !== 'off', roads: s.roads !== 'off' || s.raisedRoads !== 'off', detail,
         rails: s.rails !== 'off', buildings: s.buildings !== 'off', parks: s.parks !== 'off',
       };
       let data = null, source = '', mtProblem = '';

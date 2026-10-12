@@ -44,6 +44,15 @@
     return [...groups.entries()].sort((a, b) => b[0] - a[0]).map(([width, lines]) => ({ width, lines }));
   }
 
+  /* Raised road layer: which classes, and their full width in mm at scale 1. */
+  const RAISED_CLASSES = {
+    major: ['motorway', 'trunk', 'primary', 'motorway_link', 'trunk_link', 'primary_link'],
+    secondary: ['motorway', 'trunk', 'primary', 'secondary', 'motorway_link', 'trunk_link', 'primary_link', 'secondary_link'],
+    tertiary: ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'motorway_link', 'trunk_link', 'primary_link', 'secondary_link', 'tertiary_link'],
+  };
+  const RAISED_WIDTH = { motorway: 3.0, trunk: 2.8, primary: 2.4, secondary: 2.0, tertiary: 1.6 };
+  const raisedWidth = (cls) => RAISED_WIDTH[cls] || (/_link$/.test(cls) ? 1.4 : 1.6);
+
   /* data: output of LMS.osm.parse; s: settings. */
   function build(data, s, onStatus) {
     const { W, H } = S.dims(s.shape, s.width, s.height);
@@ -79,7 +88,20 @@
 
     onStatus && onStatus('Clipping streets…');
     const clipper = G.makeLineClipper(innerGeom);
-    const roads = s.roads !== 'off' ? clipLines(data.roads, clipper, tol) : [];
+    let roads = s.roads !== 'off' ? clipLines(data.roads, clipper, tol) : [];
+    let raised = [];
+    const raisedSet = new Set(RAISED_CLASSES[s.raisedRoads] || []);
+    if (raisedSet.size) {
+      onStatus && onStatus('Building raised road network…');
+      const main = data.roads.filter((r) => raisedSet.has(r.cls));
+      roads = roads.filter((r) => !raisedSet.has(r.cls)); // not engraved underneath the raised layer
+      const scale = s.raisedScale > 0 ? s.raisedScale : 1;
+      const items = [];
+      for (const r of main) {
+        for (const piece of clipper(G.simplify(r.pts, Math.max(tol, 0.15)))) items.push({ pts: piece, w: raisedWidth(r.cls) * scale });
+      }
+      raised = G.intersect(G.bufferLines(items), innerGeom);
+    }
     const waterways = s.waterways !== 'off' ? clipLines(data.waterways, clipper, tol) : [];
     const rails = s.rails !== 'off' ? clipLines(data.rails.map((pts) => ({ cls: 'rail', pts })), clipper, tol) : [];
 
@@ -125,14 +147,27 @@
       layers.push({ id: 'buildings', name: 'Buildings', note: 'Glue on top of the land plate', items: [{ op: 'cut', role: 'building', polys: buildings }] });
     }
 
-    if (s.frameLayer && border > 0) {
-      layers.push({ id: 'frame', name: 'Frame', note: 'Raised border on top', items: [{ op: 'cut', polys: G.difference(outerGeom, innerGeom) }] });
+    const frameRing = s.frameLayer && border > 0 ? G.difference(outerGeom, innerGeom) : [];
+    if (raised.length) {
+      // Joined to the frame the whole network is one sturdy piece; tiny enclosed slivers are filled in.
+      let net = frameRing.length ? G.union(raised.concat(frameRing)) : raised;
+      net = net
+        .filter((p) => frameRing.length || G.polygonArea(p) >= 1)
+        .map((p) => [p[0], ...p.slice(1).filter((h) => Math.abs(G.ringArea(h)) >= 2)]);
+      layers.push({
+        id: 'roads',
+        name: frameRing.length ? 'Raised roads + frame' : 'Raised roads',
+        note: frameRing.length ? 'Main roads and frame in one piece, glue on top' : 'Main roads, glue on top of the land plate',
+        items: [{ op: 'cut', role: 'raised', polys: net }],
+      });
+    } else if (frameRing.length) {
+      layers.push({ id: 'frame', name: 'Frame', note: 'Raised border on top', items: [{ op: 'cut', polys: frameRing }] });
     }
 
     return {
       W, H, outerGeom, innerGeom, border, layers,
       stats: {
-        water: water.length, roads: roads.length, buildings: buildings.length, parks: parks.length,
+        water: water.length, roads: roads.length, raised: raised.length, buildings: buildings.length, parks: parks.length,
         waterways: waterways.length, rails: rails.length, landPieces: landPlate.length,
       },
     };

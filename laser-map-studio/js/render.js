@@ -7,10 +7,10 @@
   const HAIRLINE = 0.1;
 
   const THEMES = {
-    birch:  { label: 'Birch + blue acrylic', base: '#3f7fb3', baseEngrave: '#2f6a9a', land: '#ead7b2', landEdge: '#c9ab7c', engrave: '#9b7a50', park: '#d9c194', waterway: '#5a8db8', building: '#f4e6ca', buildingEngrave: '#b7966a', frame: '#dfc699' },
-    walnut: { label: 'Walnut + white',       base: '#f2efe8', baseEngrave: '#dcd6c8', land: '#6e4b33', landEdge: '#4a3021', engrave: '#2f1f14', park: '#5d3e2a', waterway: '#d9d3c4', building: '#8a6447', buildingEngrave: '#3b281b', frame: '#5b3c27' },
-    noir:   { label: 'Black + gold',         base: '#c8a14a', baseEngrave: '#a8842f', land: '#232326', landEdge: '#0e0e10', engrave: '#6a6a72', park: '#2e2e33', waterway: '#b8913c', building: '#34343a', buildingEngrave: '#55555c', frame: '#18181b' },
-    mint:   { label: 'Plywood + mint',       base: '#9fd8c8', baseEngrave: '#7cc3b0', land: '#e3c9a0', landEdge: '#bb9a6b', engrave: '#8d6a40', park: '#cfb486', waterway: '#7cc3b0', building: '#efdcbc', buildingEngrave: '#a7845a', frame: '#d4b98c' },
+    birch:  { label: 'Birch + blue acrylic', base: '#3f7fb3', baseEngrave: '#2f6a9a', land: '#ead7b2', landEdge: '#c9ab7c', engrave: '#9b7a50', park: '#d9c194', waterway: '#5a8db8', building: '#f4e6ca', buildingEngrave: '#b7966a', frame: '#dfc699', raised: '#5a4535' },
+    walnut: { label: 'Walnut + white',       base: '#f2efe8', baseEngrave: '#dcd6c8', land: '#6e4b33', landEdge: '#4a3021', engrave: '#2f1f14', park: '#5d3e2a', waterway: '#d9d3c4', building: '#8a6447', buildingEngrave: '#3b281b', frame: '#5b3c27', raised: '#2b1d13' },
+    noir:   { label: 'Black + gold',         base: '#c8a14a', baseEngrave: '#a8842f', land: '#232326', landEdge: '#0e0e10', engrave: '#6a6a72', park: '#2e2e33', waterway: '#b8913c', building: '#34343a', buildingEngrave: '#55555c', frame: '#18181b', raised: '#3a3a40' },
+    mint:   { label: 'Plywood + mint',       base: '#9fd8c8', baseEngrave: '#7cc3b0', land: '#e3c9a0', landEdge: '#bb9a6b', engrave: '#8d6a40', park: '#cfb486', waterway: '#7cc3b0', building: '#efdcbc', buildingEngrave: '#a7845a', frame: '#d4b98c', raised: '#6b5340' },
   };
 
   function itemSvg(it, laser, theme, layerId) {
@@ -90,6 +90,8 @@
         out += rest.map((it) => itemSvg(it, false, t)).join('') + '</g>';
       } else if (layer.id === 'buildings') {
         out += `<path d="${G.ringsToPath(layer.items[0].polys)}" fill="${t.building}" fill-rule="evenodd" filter="url(#lift2)"/>`;
+      } else if (layer.id === 'roads') {
+        out += `<path d="${G.ringsToPath(layer.items[0].polys)}" fill="${t.raised}" fill-rule="evenodd" filter="url(#lift)"/>`;
       } else if (layer.id === 'frame') {
         out += `<path d="${G.ringsToPath(plate.polys)}" fill="${t.frame}" fill-rule="evenodd" stroke="${t.landEdge}" stroke-width="${r2(sh * 0.25)}" filter="url(#lift)"/>`;
       }
