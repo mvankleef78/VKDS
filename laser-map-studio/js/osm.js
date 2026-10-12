@@ -51,7 +51,7 @@
       q.push(`relation["landuse"~"^(forest|grass|meadow|recreation_ground|cemetery)$"](${b});`);
       q.push(`way["natural"="wood"](${b});`, `relation["natural"="wood"](${b});`);
     }
-    return `[out:json][timeout:120][maxsize:805306368];\n(\n  ${q.join('\n  ')}\n);\nout geom;`;
+    return `[out:json][timeout:90][maxsize:805306368];\n(\n  ${q.join('\n  ')}\n);\nout geom;`;
   }
 
   async function fetchOverpass(query, onStatus) {
@@ -61,15 +61,15 @@
       try {
         onStatus && onStatus(`Downloading map data from ${host}…`);
         const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), 150000);
+        const timer = setTimeout(() => ctrl.abort(), 100000); // a hung server rarely recovers; move on
         const res = await fetch(url, {
           method: 'POST',
           body: new URLSearchParams({ data: query }),
           signal: ctrl.signal,
         });
+        if (!res.ok) { clearTimeout(timer); throw new Error(`${host} answered HTTP ${res.status}`); }
+        const json = await res.json(); // the body can also stall, so the timer covers it too
         clearTimeout(timer);
-        if (!res.ok) throw new Error(`${host} answered HTTP ${res.status}`);
-        const json = await res.json();
         if (json.remark && /runtime error|out of memory/i.test(json.remark)) throw new Error(json.remark);
         return json;
       } catch (e) {

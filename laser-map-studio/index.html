@@ -94,6 +94,14 @@
         </div>
       </details>
 
+      <section>
+        <h2>Map data</h2>
+        <label class="field">MapTiler API key
+          <span class="search"><input id="mtKey" type="text" spellcheck="false" autocomplete="off" placeholder="Paste your key (optional)"><button id="mtTest" class="btn" type="button">Check</button></span>
+        </label>
+        <p class="hint" id="sourceInfo"></p>
+      </section>
+
       <button id="generateBtn" class="btn primary big" type="button">Generate laser files</button>
       <p id="status" class="status" role="status"></p>
     </aside>
@@ -135,6 +143,7 @@
   <script src="js/shapes.js"></script>
   <script src="js/svgshape.js"></script>
   <script src="js/osm.js"></script>
+  <script src="js/mvt.js"></script>
   <script src="js/build.js"></script>
   <script src="js/render.js"></script>
   <script src="js/app.js"></script>

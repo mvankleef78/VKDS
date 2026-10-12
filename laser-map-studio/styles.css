@@ -157,3 +157,5 @@ details summary { cursor: pointer; color: var(--muted); margin-bottom: 10px; }
 /* Hairlines are 0.1 mm in the files; make them visible on screen. */
 .laser-svg path[stroke="#FF0000"], .laser-svg path[stroke="#0000FF"] { stroke-width: 1px; vector-effect: non-scaling-stroke; }
 #shapeFile + .hint { margin: 0 0 12px; }
+label.field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.hint a { color: var(--accent); }

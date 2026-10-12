@@ -33,6 +33,19 @@ Click **Upload SVG** in the shape grid. The outline is scaled to the width you s
 - The border is applied around the outline *and* around every hole.
 - Not supported: text (convert to paths/outlines first), stroke-only lines, `<use>`, images.
 
+## Map data: MapTiler (fast) or free Overpass
+
+By default the app downloads OpenStreetMap data from the free, volunteer-run Overpass servers, which can be slow or busy.
+For fast and reliable downloads, add a **MapTiler API key**:
+
+1. Create an account at [maptiler.com](https://www.maptiler.com/) (free tier: 100k requests/month; paid plans if you need more).
+2. Copy your key from *Account → API keys* ([cloud.maptiler.com/account/keys](https://cloud.maptiler.com/account/keys/)).
+3. Paste it under **Map data** in the app and press **Check**. It is stored in your browser only.
+
+With a key the app downloads MapTiler vector tiles (OpenMapTiles schema, zoom 14 max, about 20–60 tiles per map), uses MapTiler place search, and adds a "MapTiler Streets" background map (after a reload). If MapTiler fails for any reason other than a rejected key, it falls back to Overpass automatically.
+
+Note: at large areas the tiles are fetched at a lower zoom level, where minor streets and buildings are not included.
+
 ## Worldwide coverage
 
 - Oceans and seas are built from OSM `natural=coastline` lines (land is on the left of a coastline), so coastal cities, islands and fjords work anywhere.
@@ -47,6 +60,7 @@ Very large areas (> ~140 × 140 km) are refused; for big regions use "Major road
 - `js/shapes.js` – frame shapes (built-in + uploaded)
 - `js/svgshape.js` – SVG import: path flattening, transforms, holes
 - `js/osm.js` – Overpass query + parsing
+- `js/mvt.js` – MapTiler vector tiles: download, built-in vector-tile decoder, feature mapping
 - `js/build.js` – turns map features + settings into laser layers
 - `js/render.js` – laser SVGs and the finished-look preview
 - `js/app.js` – UI

@@ -85,10 +85,20 @@
       maxZoom: 19, attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
     }),
   };
+  /* MapTiler (optional, paid/free-tier key): fast vector data, geocoding and a basemap. */
+  const MT_KEY_STORE = 'laser-map-studio:maptiler-key';
+  const getKey = () => { try { return (localStorage.getItem(MT_KEY_STORE) || '').trim(); } catch (_) { return ''; } };
+  const MT_ATTR = '<a href="https://www.maptiler.com/copyright/">&copy; MapTiler</a> ' + OSM_ATTR;
+  if (getKey()) {
+    baseMaps['MapTiler Streets'] = L.tileLayer(`https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=${encodeURIComponent(getKey())}`, {
+      maxZoom: 20, attribution: MT_ATTR,
+    });
+  }
+
   const BASE_KEY = 'laser-map-studio:basemap';
   let baseName = null;
   try { baseName = localStorage.getItem(BASE_KEY); } catch (_) { /* storage unavailable */ }
-  if (!baseMaps[baseName]) baseName = location.protocol === 'file:' ? 'Streets (Esri)' : 'OpenStreetMap';
+  if (!baseMaps[baseName]) baseName = baseMaps['MapTiler Streets'] ? 'MapTiler Streets' : location.protocol === 'file:' ? 'Streets (Esri)' : 'OpenStreetMap';
   baseMaps[baseName].addTo(map);
   L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
   map.on('baselayerchange', (e) => {
@@ -260,21 +270,18 @@
     const list = $('searchResults');
     list.innerHTML = '<li class="muted">Searching…</li>';
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(q)}&accept-language=${encodeURIComponent(navigator.language || 'en')}`;
-      const res = await fetch(url, { headers: { Accept: 'application/json' } });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const items = await res.json();
+      const items = await geocode(q);
       list.innerHTML = '';
       if (!items.length) { list.innerHTML = '<li class="muted">No places found.</li>'; return; }
       for (const it of items) {
         const li = document.createElement('li');
         const btn = document.createElement('button');
         btn.type = 'button';
-        btn.textContent = it.display_name;
+        btn.textContent = it.label;
         btn.onclick = () => {
-          const bb = it.boundingbox.map(parseFloat);
-          map.fitBounds([[bb[0], bb[2]], [bb[1], bb[3]]], { maxZoom: 16 });
-          state.placeName = it.name || it.display_name.split(',')[0];
+          if (it.bounds) map.fitBounds(it.bounds, { maxZoom: 16 });
+          else map.setView(it.center, 15);
+          state.placeName = it.name;
           list.innerHTML = '';
         };
         li.appendChild(btn);
@@ -284,6 +291,65 @@
       list.innerHTML = `<li class="muted">Search failed (${err.message}).</li>`;
     }
   });
+
+  /* Place search: MapTiler when a key is set, else (or on failure) OpenStreetMap Nominatim.
+     Returns [{ label, name, bounds, center }]. */
+  async function geocode(q) {
+    const lang = encodeURIComponent((navigator.language || 'en').slice(0, 2));
+    const key = getKey();
+    if (key) {
+      try {
+        const res = await fetch(`https://api.maptiler.com/geocoding/${encodeURIComponent(q)}.json?key=${encodeURIComponent(key)}&limit=6&language=${lang}`);
+        if (res.ok) {
+          const js = await res.json();
+          return (js.features || []).map((f) => ({
+            label: f.place_name || f.text,
+            name: f.text || (f.place_name || '').split(',')[0],
+            bounds: f.bbox ? [[f.bbox[1], f.bbox[0]], [f.bbox[3], f.bbox[2]]] : null,
+            center: f.center ? [f.center[1], f.center[0]] : null,
+          }));
+        }
+      } catch (_) { /* fall through to Nominatim */ }
+    }
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q=${encodeURIComponent(q)}&accept-language=${lang}`, { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return (await res.json()).map((it) => {
+      const bb = it.boundingbox.map(parseFloat);
+      return { label: it.display_name, name: it.name || it.display_name.split(',')[0], bounds: [[bb[0], bb[2]], [bb[1], bb[3]]], center: [+it.lat, +it.lon] };
+    });
+  }
+
+  /* ---------- map data source ---------- */
+
+  function updateSourceInfo() {
+    const key = getKey();
+    $('sourceInfo').innerHTML = key
+      ? 'Using <strong>MapTiler</strong> vector data (fast). The free OpenStreetMap servers are only used as a backup.'
+      : 'No key: using the free OpenStreetMap servers, which can be slow or busy. Get a key at ' +
+        '<a href="https://cloud.maptiler.com/account/keys/" target="_blank" rel="noopener">cloud.maptiler.com</a> for fast downloads.';
+  }
+
+  $('mtKey').value = getKey();
+  $('mtKey').addEventListener('change', () => {
+    const v = $('mtKey').value.trim();
+    try { v ? localStorage.setItem(MT_KEY_STORE, v) : localStorage.removeItem(MT_KEY_STORE); } catch (_) { /* storage unavailable */ }
+    state.cache = { query: null, json: null };
+    updateSourceInfo();
+    setStatus(v ? 'MapTiler key saved. Reload the page to also get the MapTiler background map.' : 'MapTiler key removed.');
+  });
+  $('mtTest').addEventListener('click', async () => {
+    $('mtKey').dispatchEvent(new Event('change'));
+    const key = getKey();
+    if (!key) return setStatus('Paste a MapTiler API key first.', 'error');
+    setStatus('Checking key…');
+    try {
+      await window.LMS.mvt.testKey(key);
+      setStatus('MapTiler key works.', 'ok');
+    } catch (e) {
+      setStatus(e.message, 'error');
+    }
+  });
+  updateSourceInfo();
 
   $('locateBtn').addEventListener('click', () => {
     if (!navigator.geolocation) return setStatus('Geolocation is not available in this browser.', 'error');
@@ -345,20 +411,44 @@
       const se = map.containerPointToLatLng([o.left + o.w + mx, o.top + o.h + my]);
       const bbox = { s: Math.max(-85, se.lat), w: Math.max(-180, nw.lng), n: Math.min(85, nw.lat), e: Math.min(180, se.lng) };
 
-      const query = OSM.buildQuery(bbox, {
+      const feat = {
         water: s.water !== 'off', waterways: s.waterways !== 'off', roads: s.roads !== 'off', detail,
         rails: s.rails !== 'off', buildings: s.buildings !== 'off', parks: s.parks !== 'off',
-      });
-
-      let json;
-      if (state.cache.query === query) json = state.cache.json;
-      else {
-        json = await OSM.fetchOverpass(query, setStatus);
-        state.cache = { query, json };
+      };
+      let data = null, source = '';
+      const key = getKey();
+      if (key) {
+        const ck = 'mt|' + JSON.stringify([bbox, feat]);
+        try {
+          let res;
+          if (state.cache.query === ck) res = state.cache.json;
+          else {
+            res = await window.LMS.mvt.load(bbox, feat, key, setStatus);
+            state.cache = { query: ck, json: res };
+          }
+          setStatus('Processing map features…');
+          await tick();
+          data = window.LMS.mvt.projectRaw(res, proj);
+          source = `MapTiler, ${res.tiles} tiles at zoom ${res.zoom}` + (res.zoom < 13 && feat.buildings ? ' – too zoomed out for buildings' : '');
+        } catch (e) {
+          if (e.auth) throw e;
+          console.warn(e);
+          setStatus(`MapTiler failed (${e.message}) – trying the OpenStreetMap servers…`);
+        }
       }
-      setStatus(`Processing ${json.elements.length.toLocaleString()} map features…`);
-      await tick();
-      const data = OSM.parse(json, proj);
+      if (!data) {
+        const query = OSM.buildQuery(bbox, feat);
+        let json;
+        if (state.cache.query === query) json = state.cache.json;
+        else {
+          json = await OSM.fetchOverpass(query, setStatus);
+          state.cache = { query, json };
+        }
+        setStatus(`Processing ${json.elements.length.toLocaleString()} map features…`);
+        await tick();
+        data = OSM.parse(json, proj);
+        source = 'OpenStreetMap Overpass';
+      }
       const model = build(data, s, setStatus);
       await tick();
       model.settings = s;
@@ -366,7 +456,7 @@
       const st = model.stats;
       setStatus(`Done – ${st.roads} street segments, ${st.water} water areas` +
         (st.buildings ? `, ${st.buildings} buildings` : '') + (st.parks ? `, ${st.parks} parks` : '') +
-        `. ${model.layers.length} layers.`, 'ok');
+        `. ${model.layers.length} layers. (${source})`, 'ok');
       $$('.tab')[1].disabled = false;
       showView('preview');
       renderPreview();
