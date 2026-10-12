@@ -69,11 +69,39 @@
 
   const iv = initialView();
   const map = L.map('map', { zoomSnap: 0.25, zoomDelta: 0.5, worldCopyJump: true }).setView(iv.center, iv.zoom);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19,
-    subdomains: 'abcd',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-  }).addTo(map);
+  /* Background maps that need no API key. OpenStreetMap's own tile servers refuse requests
+     without a Referer (pages opened as file://), so Esri's grey canvas is the fallback there. */
+  const OSM_ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+  const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+  const baseMaps = {
+    'OpenStreetMap': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: OSM_ATTR }),
+    'Light grey': L.tileLayer(ESRI + 'Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 16, attribution: 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors',
+    }),
+    'Streets (Esri)': L.tileLayer(ESRI + 'World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19, attribution: 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, USGS, &copy; OpenStreetMap contributors',
+    }),
+    'Satellite': L.tileLayer(ESRI + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19, attribution: 'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community',
+    }),
+  };
+  const BASE_KEY = 'laser-map-studio:basemap';
+  let baseName = null;
+  try { baseName = localStorage.getItem(BASE_KEY); } catch (_) { /* storage unavailable */ }
+  if (!baseMaps[baseName]) baseName = location.protocol === 'file:' ? 'Streets (Esri)' : 'OpenStreetMap';
+  baseMaps[baseName].addTo(map);
+  L.control.layers(baseMaps, null, { position: 'topright' }).addTo(map);
+  map.on('baselayerchange', (e) => {
+    try { localStorage.setItem(BASE_KEY, e.name); } catch (_) { /* storage unavailable */ }
+  });
+
+  // If the OpenStreetMap tile server refuses us, switch to a background that works.
+  let tileErrors = 0;
+  baseMaps['OpenStreetMap'].on('tileerror', () => {
+    if (++tileErrors !== 4 || !map.hasLayer(baseMaps['OpenStreetMap'])) return;
+    map.removeLayer(baseMaps['OpenStreetMap']);
+    baseMaps['Streets (Esri)'].addTo(map);
+  });
 
   map.on('moveend', () => {
     const c = map.getCenter();

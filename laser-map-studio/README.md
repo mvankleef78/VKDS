@@ -52,4 +52,4 @@ Very large areas (> ~140 × 140 km) are refused; for big regions use "Major road
 - `js/app.js` – UI
 - `vendor/` – Leaflet 1.9.4, polygon-clipping 0.15.7, JSZip 3.10.1 (licences included)
 
-Map data © OpenStreetMap contributors (ODbL). Basemap tiles © CARTO.
+Map data © OpenStreetMap contributors (ODbL). Background maps: OpenStreetMap or Esri (switch with the layer button, top-right of the map). No API keys needed.
