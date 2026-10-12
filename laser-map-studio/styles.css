@@ -81,6 +81,15 @@ input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1p
 .shape-btn path { fill: var(--wood); stroke: var(--muted); stroke-width: 1; }
 .shape-btn.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .shape-btn.active path { stroke: var(--accent); }
+.shape-btn { position: relative; }
+.shape-btn span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shape-btn.upload { border-style: dashed; color: var(--muted); }
+.shape-btn.upload path { fill: none; stroke: currentColor; }
+.shape-del {
+  position: absolute; top: 2px; right: 4px; width: 18px; height: 18px; line-height: 16px; border-radius: 50%;
+  font-size: 15px; color: var(--muted); text-align: center;
+}
+.shape-del:hover { background: var(--line); color: var(--ink); }
 
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 8px; align-items: end; }
 .row label { font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
@@ -147,3 +156,4 @@ details summary { cursor: pointer; color: var(--muted); margin-bottom: 10px; }
 
 /* Hairlines are 0.1 mm in the files; make them visible on screen. */
 .laser-svg path[stroke="#FF0000"], .laser-svg path[stroke="#0000FF"] { stroke-width: 1px; vector-effect: non-scaling-stroke; }
+#shapeFile + .hint { margin: 0 0 12px; }

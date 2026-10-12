@@ -48,12 +48,11 @@
   function build(data, s, onStatus) {
     const { W, H } = S.dims(s.shape, s.width, s.height);
     const border = Math.max(0, Math.min(s.border, Math.min(W, H) / 4));
-    const outer = S.ring(s.shape, W, H, 0);
-    const inner = border > 0 ? S.ring(s.shape, W, H, border) : outer;
+    const outerGeom = S.geom(s.shape, W, H, 0);
+    const innerGeom = border > 0 ? S.geom(s.shape, W, H, border) : outerGeom;
+    if (!innerGeom.length) throw new Error('The border is too wide for this shape – nothing is left inside it.');
     const tol = s.simplify;
     const minArea = s.minArea;
-    const innerGeom = [[inner]];
-    const outerGeom = [[outer]];
 
     onStatus && onStatus('Building coastline and water…');
     // Coastline: work on a rect a little larger than the shape.
@@ -79,7 +78,7 @@
       : outerGeom;
 
     onStatus && onStatus('Clipping streets…');
-    const clipper = G.makeLineClipper(inner);
+    const clipper = G.makeLineClipper(innerGeom);
     const roads = s.roads !== 'off' ? clipLines(data.roads, clipper, tol) : [];
     const waterways = s.waterways !== 'off' ? clipLines(data.waterways, clipper, tol) : [];
     const rails = s.rails !== 'off' ? clipLines(data.rails.map((pts) => ({ cls: 'rail', pts })), clipper, tol) : [];
@@ -87,7 +86,7 @@
     onStatus && onStatus('Processing buildings and parks…');
     let buildings = [];
     if (s.buildings !== 'off') {
-      buildings = G.clipPolygonsToRing(cleanPolys(data.buildings, Math.min(tol, 0.05), s.minBuilding), inner)
+      buildings = G.clipPolygonsToGeom(cleanPolys(data.buildings, Math.min(tol, 0.05), s.minBuilding), innerGeom)
         .filter((p) => G.polygonArea(p) >= s.minBuilding);
     }
     let parks = [];
@@ -131,7 +130,7 @@
     }
 
     return {
-      W, H, outer, inner, border, layers,
+      W, H, outerGeom, innerGeom, border, layers,
       stats: {
         water: water.length, roads: roads.length, buildings: buildings.length, parks: parks.length,
         waterways: waterways.length, rails: rails.length, landPieces: landPlate.length,

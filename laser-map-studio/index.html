@@ -36,6 +36,8 @@
       <section>
         <h2>Shape &amp; size</h2>
         <div class="shape-grid" id="shapeGrid"></div>
+        <input id="shapeFile" type="file" accept=".svg,image/svg+xml" hidden>
+        <p class="hint">Upload SVG: any closed outline, holes included (e.g. a ring or a letter). Text and strokes must be converted to paths.</p>
         <div class="row">
           <label>Width <span class="unit">mm</span><input id="width" type="number" min="40" max="1200" step="5" value="300"></label>
           <label id="heightWrap">Height <span class="unit">mm</span><input id="height" type="number" min="40" max="1200" step="5" value="200"></label>
@@ -131,6 +133,7 @@
   <script src="vendor/jszip.min.js"></script>
   <script src="js/geometry.js"></script>
   <script src="js/shapes.js"></script>
+  <script src="js/svgshape.js"></script>
   <script src="js/osm.js"></script>
   <script src="js/build.js"></script>
   <script src="js/render.js"></script>

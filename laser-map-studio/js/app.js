@@ -54,7 +54,7 @@
     let s = null;
     try { s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (_) { s = null; }
     if (!s) return;
-    if (s.shape && S.SHAPES[s.shape]) state.shape = s.shape;
+    if (s.shape && S.info(s.shape)) state.shape = s.shape;
     for (const id of FIELDS) if (s[id] !== undefined && $(id)) $(id).value = s[id];
     for (const id of CHECKS) if (s[id] !== undefined) $(id).checked = !!s[id];
   }
@@ -97,15 +97,14 @@
     const o = overlayRect();
     const svg = $('overlay');
     svg.setAttribute('viewBox', `0 0 ${o.cw} ${o.ch}`);
-    const toPx = (ring) => ring.map((p) => [o.left + p[0] * o.k, o.top + p[1] * o.k]);
-    const outer = toPx(S.ring(o.s.shape, o.W, o.H, 0));
+    const toPx = (geom) => geom.map((poly) => poly.map((r) => r.map((p) => [o.left + p[0] * o.k, o.top + p[1] * o.k])));
+    const outer = G.ringsToPath(toPx(S.geom(o.s.shape, o.W, o.H, 0)));
     const border = Math.min(o.s.border, Math.min(o.W, o.H) / 4);
-    const inner = border > 0 ? toPx(S.ring(o.s.shape, o.W, o.H, border)) : null;
-    const mask = `M0 0H${o.cw}V${o.ch}H0Z` + G.ringsToPath([[outer]]);
+    const inner = border > 0 ? G.ringsToPath(toPx(S.geom(o.s.shape, o.W, o.H, border))) : '';
     svg.innerHTML =
-      `<path d="${mask}" fill="rgba(20,24,32,0.42)" fill-rule="evenodd"/>` +
-      `<path d="${G.ringsToPath([[outer]])}" fill="none" stroke="#e4572e" stroke-width="2.5"/>` +
-      (inner ? `<path d="${G.ringsToPath([[inner]])}" fill="none" stroke="#e4572e" stroke-width="1.2" stroke-dasharray="6 5" opacity="0.85"/>` : '');
+      `<path d="M0 0H${o.cw}V${o.ch}H0Z${outer}" fill="rgba(20,24,32,0.42)" fill-rule="evenodd"/>` +
+      `<path d="${outer}" fill="none" stroke="#e4572e" stroke-width="2.5"/>` +
+      (inner ? `<path d="${inner}" fill="none" stroke="#e4572e" stroke-width="1.2" stroke-dasharray="6 5" opacity="0.85"/>` : '');
     updateScale();
     updateSizeInfo(o);
   }
@@ -127,27 +126,102 @@
 
   function updateSizeInfo(o) {
     $('sizeInfo').textContent = `Finished size: ${Math.round(o.W)} × ${Math.round(o.H)} mm`;
-    $('heightWrap').style.display = S.SHAPES[o.s.shape].freeHeight ? '' : 'none';
+    $('heightWrap').style.display = S.info(o.s.shape).freeHeight ? '' : 'none';
   }
 
   /* ---------- shape picker ---------- */
 
+  const LIB_KEY = 'laser-map-studio:shapes';
+  let library = [];
+
+  function loadLibrary() {
+    try { library = JSON.parse(localStorage.getItem(LIB_KEY) || '[]') || []; } catch (_) { library = []; }
+    S.setCustom(library);
+  }
+
+  function saveLibrary() {
+    S.setCustom(library);
+    try {
+      localStorage.setItem(LIB_KEY, JSON.stringify(library));
+      return true;
+    } catch (_) {
+      return false; // storage full or blocked: shape still works for this visit
+    }
+  }
+
+  function selectShape(key) {
+    state.shape = key;
+    buildShapeGrid();
+    drawOverlay();
+    saveSettings();
+  }
+
+  const escapeHtml = (t) => t.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function shapeIcon(key) {
+    const { W, H } = S.dims(key, 100, 66);
+    const k = 30 / Math.max(W, H);
+    const geom = S.geom(key, W, H, 0).map((poly) => poly.map((r) => r.map((p) => [p[0] * k + (36 - W * k) / 2, p[1] * k + (36 - H * k) / 2])));
+    return `<svg viewBox="0 0 36 36"><path fill-rule="evenodd" d="${G.ringsToPath(geom)}"/></svg>`;
+  }
+
   function buildShapeGrid() {
     const grid = $('shapeGrid');
     grid.innerHTML = '';
-    for (const [key, def] of Object.entries(S.SHAPES)) {
-      const { W, H } = S.dims(key, 100, 66);
-      const k = 30 / Math.max(W, H);
-      const ring = S.ring(key, W, H, 0).map((p) => [p[0] * k + (36 - W * k) / 2, p[1] * k + (36 - H * k) / 2]);
+    const keys = Object.keys(S.SHAPES).concat(library.map((c) => 'custom:' + c.id));
+    for (const key of keys) {
+      const label = S.info(key).label;
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'shape-btn' + (key === state.shape ? ' active' : '');
-      b.title = def.label;
-      b.innerHTML = `<svg viewBox="0 0 36 36"><path d="${G.ringsToPath([[ring]])}"/></svg><span>${def.label.replace(' rectangle', '')}</span>`;
-      b.onclick = () => { state.shape = key; buildShapeGrid(); drawOverlay(); saveSettings(); };
+      b.title = label;
+      b.innerHTML = `${shapeIcon(key)}<span>${escapeHtml(label.replace(' rectangle', ''))}</span>`;
+      b.onclick = () => selectShape(key);
+      if (S.isCustom(key)) {
+        const del = document.createElement('span');
+        del.className = 'shape-del';
+        del.title = 'Remove this shape';
+        del.textContent = '×';
+        del.onclick = (e) => {
+          e.stopPropagation();
+          if (!confirm(`Remove the shape "${label}"?`)) return;
+          library = library.filter((c) => 'custom:' + c.id !== key);
+          saveLibrary();
+          selectShape(state.shape === key ? 'rect' : state.shape);
+        };
+        b.appendChild(del);
+      }
       grid.appendChild(b);
     }
+    const up = document.createElement('button');
+    up.type = 'button';
+    up.className = 'shape-btn upload';
+    up.title = 'Upload your own shape as an SVG file';
+    up.innerHTML = '<svg viewBox="0 0 36 36"><path d="M18 8v16M10 16h16" stroke-width="2.4" stroke-linecap="round"/></svg><span>Upload SVG</span>';
+    up.onclick = () => $('shapeFile').click();
+    grid.appendChild(up);
   }
+
+  $('shapeFile').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      if (file.size > 5 * 1024 * 1024) throw new Error('That SVG is larger than 5 MB.');
+      const { polys, aspect } = window.LMS.svgShape.importSvg(await file.text());
+      const name = file.name.replace(/\.svg$/i, '').replace(/[_-]+/g, ' ').trim().slice(0, 24) || 'Custom';
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      library.push({ id, name, aspect, polys });
+      const stored = saveLibrary();
+      selectShape('custom:' + id);
+      const holes = polys.reduce((n, p) => n + p.length - 1, 0);
+      setStatus(`Shape "${name}" added – ${polys.length} part${polys.length > 1 ? 's' : ''}` +
+        (holes ? `, ${holes} hole${holes > 1 ? 's' : ''}` : '') + '.' +
+        (stored ? '' : ' (Browser storage is full, so it will not be remembered.)'), 'ok');
+    } catch (err) {
+      setStatus('Could not use that SVG: ' + err.message, 'error');
+    }
+  });
 
   /* ---------- search ---------- */
 
@@ -358,7 +432,7 @@
       'Laser Map Studio export',
       '=======================',
       `Place: ${state.placeName}`,
-      `Shape: ${S.SHAPES[s.shape].label}, ${Math.round(m.W)} x ${Math.round(m.H)} mm, border ${m.border} mm`,
+      `Shape: ${S.info(s.shape).label}, ${Math.round(m.W)} x ${Math.round(m.H)} mm, border ${m.border} mm`,
       '',
       'Colour convention (all units in mm):',
       '  RED   #FF0000  stroke 0.1 mm  -> vector CUT',
@@ -385,6 +459,7 @@
   }
   $('theme').addEventListener('change', () => { saveSettings(); renderPreview(); });
 
+  loadLibrary();
   loadSettings();
   buildShapeGrid();
   for (const id of FIELDS.concat(CHECKS)) {

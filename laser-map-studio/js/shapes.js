@@ -25,8 +25,30 @@
     heart:   { label: 'Heart' },
   };
 
+  /* Uploaded shapes: id → { name, aspect, polys } with polys normalised to width 1. */
+  const custom = new Map();
+  const isCustom = (type) => typeof type === 'string' && type.startsWith('custom:');
+  const customOf = (type) => custom.get(type.slice(7));
+
+  function setCustom(list) {
+    custom.clear();
+    for (const c of list) custom.set(c.id, c);
+  }
+
+  function info(type) {
+    if (isCustom(type)) {
+      const c = customOf(type);
+      return c ? { label: c.name, freeHeight: false, custom: true } : null;
+    }
+    return SHAPES[type] || null;
+  }
+
   /* Outer bounding box in mm for a shape given the user's width (and height when free). */
   function dims(type, width, height) {
+    if (isCustom(type)) {
+      const c = customOf(type);
+      return { W: width, H: width * (c ? c.aspect : 1) };
+    }
     switch (type) {
       case 'rect':
       case 'rounded': return { W: width, H: height };
@@ -88,6 +110,23 @@
     throw new Error('Unknown shape ' + type);
   }
 
+  /* Shape as a multipolygon ([[outer, ...holes], ...]) in mm, inset by `b` mm. */
+  const insetCache = new Map();
+  function geom(type, W, H, b) {
+    b = b || 0;
+    if (!isCustom(type)) return [[ring(type, W, H, b)]];
+    const c = customOf(type);
+    if (!c) return [[ring('rect', W, H, b)]];
+    const scaled = c.polys.map((poly) => poly.map((r) => r.map((p) => [p[0] * W, p[1] * W])));
+    if (!(b > 0)) return scaled;
+    const key = `${type}|${W.toFixed(2)}|${b.toFixed(2)}`;
+    if (!insetCache.has(key)) {
+      if (insetCache.size > 40) insetCache.clear();
+      insetCache.set(key, root.LMS.geom.inset(scaled, b));
+    }
+    return insetCache.get(key);
+  }
+
   root.LMS = root.LMS || {};
-  root.LMS.shapes = { SHAPES, dims, ring };
+  root.LMS.shapes = { SHAPES, dims, ring, geom, info, setCustom, isCustom };
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -83,7 +83,7 @@
       const plate = layer.items.find((it) => it.op === 'cut' && it.role !== 'building');
       const rest = layer.items.filter((it) => it !== plate);
       if (layer.id === 'base') {
-        out += `<path d="${G.ringsToPath(plate.polys)}" fill="${t.base}" filter="url(#lift)"/>`;
+        out += `<path d="${G.ringsToPath(plate.polys)}" fill="${t.base}" fill-rule="evenodd" filter="url(#lift)"/>`;
         out += rest.map((it) => itemSvg(it, false, t)).join('');
       } else if (layer.id === 'land') {
         out += `<g><path d="${G.ringsToPath(plate.polys)}" fill="${t.land}" fill-rule="evenodd" stroke="${t.landEdge}" stroke-width="${r2(sh * 0.25)}" filter="url(#lift)"/>`;

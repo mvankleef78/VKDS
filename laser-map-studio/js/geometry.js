@@ -193,13 +193,25 @@
     return u >= 0 && u <= 1 ? t : -1;
   }
 
-  /* Clip polylines to the inside of a (simple) ring. */
-  G.makeLineClipper = function (ring) {
-    const rb = G.bbox(ring);
+  /* Even-odd point test over every ring of a multipolygon (holes included). */
+  G.pointInRings = function (pt, rings) {
+    let inside = false;
+    for (const r of rings) if (G.pointInRing(pt, r)) inside = !inside;
+    return inside;
+  };
+
+  const allRings = (geom) => geom.reduce((acc, poly) => acc.concat(poly), []);
+
+  /* Clip polylines to the inside of a multipolygon (outer rings minus holes). */
+  G.makeLineClipper = function (geom) {
+    const rings = allRings(geom);
+    const rb = G.bbox(rings.reduce((acc, r) => acc.concat(r), []));
     const edges = [];
-    for (let i = 0; i < ring.length; i++) {
-      const c = ring[i], d = ring[(i + 1) % ring.length];
-      edges.push([c, d, Math.min(c[0], d[0]), Math.max(c[0], d[0]), Math.min(c[1], d[1]), Math.max(c[1], d[1])]);
+    for (const ring of rings) {
+      for (let i = 0; i < ring.length; i++) {
+        const c = ring[i], d = ring[(i + 1) % ring.length];
+        edges.push([c, d, Math.min(c[0], d[0]), Math.max(c[0], d[0]), Math.min(c[1], d[1]), Math.max(c[1], d[1])]);
+      }
     }
     return function clip(line) {
       const lb = G.bbox(line);
@@ -224,7 +236,7 @@
         for (let k = 0; k < ts.length - 1; k++) {
           const t0 = ts[k], t1 = ts[k + 1];
           if (t1 - t0 < 1e-9) continue;
-          const inside = G.pointInRing(lerp(a, b, (t0 + t1) / 2), ring);
+          const inside = G.pointInRings(lerp(a, b, (t0 + t1) / 2), rings);
           if (inside) {
             const p0 = lerp(a, b, t0), p1 = lerp(a, b, t1);
             if (cur && k === 0 && t0 === 0) cur.push(p1);
@@ -311,7 +323,9 @@
 
   /* ---------- polygon boolean wrappers (tolerant to bad input) ---------- */
 
-  const toGeom = (polys) => polys.map((p) => p.map((r) => r.map((q) => [q[0], q[1]])));
+  /* Snap to a fine grid: polygon-clipping is fragile with near-coincident float coordinates. */
+  const snapGeom = (polys, q) => polys.map((p) => p.map((r) => r.map((pt) => [Math.round(pt[0] * q) / q, Math.round(pt[1] * q) / q])));
+  const toGeom = (polys) => snapGeom(polys, 1e6);
 
   G.union = function (polys) {
     polys = polys.filter((p) => p && p[0] && p[0].length >= 3);
@@ -319,43 +333,54 @@
     try {
       return PC().union(...toGeom(polys));
     } catch (e) {
-      // fall back to incremental union, skipping offending polygons
+      // fall back to incremental union; retry each failing polygon on a coarser grid before skipping it
       let acc = [];
       for (const p of polys) {
-        try { acc = acc.length ? PC().union(acc, toGeom([p])[0]) : toGeom([p]); } catch (_) { /* skip */ }
+        for (const q of [1e6, 1e4, 1e3]) {
+          try { acc = acc.length ? PC().union(snapGeom(acc, q), snapGeom([p], q)[0]) : snapGeom([p], q); break; } catch (_) { /* try coarser */ }
+        }
       }
       return acc;
     }
   };
 
+  G.xor = function (a, b) {
+    if (!a.length) return b;
+    try { return PC().xor(toGeom(a), toGeom(b)); } catch (e) {
+      try { return PC().xor(snapGeom(a, 1e4), snapGeom(b, 1e4)); } catch (_) { return a; }
+    }
+  };
+
   G.intersect = function (a, b) {
     if (!a.length || !b.length) return [];
-    try { return PC().intersection(a, b); } catch (e) { return []; }
+    try { return PC().intersection(toGeom(a), toGeom(b)); } catch (e) {
+      try { return PC().intersection(snapGeom(a, 1e4), snapGeom(b, 1e4)); } catch (_) { return []; }
+    }
   };
 
   G.difference = function (a, b) {
     if (!a.length) return [];
     if (!b.length) return a;
-    try { return PC().difference(a, b); } catch (e) { return a; }
+    try { return PC().difference(toGeom(a), toGeom(b)); } catch (e) {
+      try { return PC().difference(snapGeom(a, 1e4), snapGeom(b, 1e4)); } catch (_) { return a; }
+    }
   };
 
-  /* Clip many polygons against a ring, with a fast path for ones fully inside. */
-  G.clipPolygonsToRing = function (polys, ring) {
-    const rb = G.bbox(ring);
-    const clipGeom = [[ring]];
+  /* Clip many polygons against a multipolygon, with a fast path for ones fully inside. */
+  G.clipPolygonsToGeom = function (polys, geom) {
+    const rings = allRings(geom);
+    const rb = G.bbox(rings.reduce((acc, r) => acc.concat(r), []));
+    const simpleRect = geom.length === 1 && geom[0].length === 1 && geom[0][0].length <= 5;
     const out = [];
     for (const poly of polys) {
       const pb = G.bbox(poly[0]);
       if (!bboxOverlap(pb, rb)) continue;
-      const fullyInside = bboxInside(pb, rb) && poly[0].every((p) => G.pointInRing(p, ring));
-      if (fullyInside && rectLike(ring)) { out.push(poly); continue; }
-      if (fullyInside && !anyEdgeCross(poly[0], ring)) { out.push(poly); continue; }
-      for (const r of G.intersect([poly], clipGeom)) out.push(r);
+      const allIn = bboxInside(pb, rb) && poly[0].every((p) => G.pointInRings(p, rings));
+      if (allIn && (simpleRect || !rings.some((r) => anyEdgeCross(poly[0], r)))) { out.push(poly); continue; }
+      for (const r of G.intersect([poly], geom)) out.push(r);
     }
     return out;
   };
-
-  const rectLike = (ring) => ring.length <= 5;
 
   function anyEdgeCross(a, ring) {
     for (let i = 0; i < a.length - 1; i++) {
@@ -366,6 +391,36 @@
     }
     return false;
   }
+
+  /* Shrink a multipolygon by `b` (also widens holes): subtract a buffer around every edge. */
+  G.inset = function (geom, b) {
+    if (!(b > 0)) return geom;
+    const pieces = [];
+    const tol = Math.max(0.05, b * 0.05);
+    const disc = (c) => {
+      const out = [];
+      for (let i = 0; i < 12; i++) {
+        const a = ((i + 0.5) / 12) * Math.PI * 2; // half-step: avoid vertices exactly on the edge quads
+        out.push([c[0] + b * Math.cos(a), c[1] + b * Math.sin(a)]);
+      }
+      return [out];
+    };
+    for (const poly of geom) {
+      for (const ring0 of poly) {
+        const closed = G.isClosed(ring0) ? ring0 : ring0.concat([ring0[0]]);
+        const ring = G.simplifyRing(closed, tol) || closed;
+        for (let i = 0; i < ring.length - 1; i++) {
+          const p = ring[i], q = ring[i + 1];
+          const dx = q[0] - p[0], dy = q[1] - p[1], len = Math.hypot(dx, dy);
+          if (len < 1e-9) continue;
+          const nx = (-dy / len) * b, ny = (dx / len) * b;
+          pieces.push([[[p[0] + nx, p[1] + ny], [q[0] + nx, q[1] + ny], [q[0] - nx, q[1] - ny], [p[0] - nx, p[1] - ny]]]);
+          pieces.push(disc(p));
+        }
+      }
+    }
+    return G.difference(geom, G.union(pieces));
+  };
 
   /* ---------- SVG path builders ---------- */
 
