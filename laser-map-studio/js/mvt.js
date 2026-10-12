@@ -158,13 +158,50 @@
 
   /* ---------- download + assemble ---------- */
 
-  const TILE_URL = (z, x, y, key) => `https://api.maptiler.com/tiles/v3/${z}/${x}/${y}.pbf?key=${encodeURIComponent(key)}`;
+  /* Ask MapTiler's TileJSON for the real tile URL instead of guessing it.
+     Tries the current OpenMapTiles tileset first, then the older "v3" id. */
+  const TILESETS = ['v3-openmaptiles', 'v3'];
+  const templates = new Map();
+
+  async function tileTemplate(key) {
+    if (templates.has(key)) return templates.get(key);
+    const problems = [];
+    for (const id of TILESETS) {
+      let res;
+      try {
+        res = await fetch(`https://api.maptiler.com/tiles/${id}/tiles.json?key=${encodeURIComponent(key)}`);
+      } catch (e) {
+        throw new Error('Network error while contacting MapTiler.');
+      }
+      if (res.status === 401 || res.status === 403) {
+        const err = new Error('MapTiler rejected the API key – check it under "Map data" (Account → API keys on maptiler.com).');
+        err.auth = true;
+        throw err;
+      }
+      const text = await res.text();
+      let tj = null;
+      try { tj = JSON.parse(text); } catch (_) { /* not JSON */ }
+      if (res.ok && tj && Array.isArray(tj.tiles) && tj.tiles.length) {
+        let url = tj.tiles[0];
+        if (!/[?&]key=/.test(url)) url += (url.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(key);
+        const t = { url, maxzoom: Math.min(14, tj.maxzoom || 14) };
+        templates.set(key, t);
+        return t;
+      }
+      problems.push(`${id}: HTTP ${res.status} ${snippet(text)}`);
+    }
+    throw new Error('MapTiler has no vector tileset for this key (' + problems.join('; ') + ')');
+  }
+
+  const snippet = (text) => text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
 
   async function fetchTile(z, x, y, key, signal) {
+    const tpl = await tileTemplate(key);
+    const url = tpl.url.replace('{z}', z).replace('{x}', x).replace('{y}', y);
     for (let attempt = 0; attempt < 3; attempt++) {
       let res;
       try {
-        res = await fetch(TILE_URL(z, x, y, key), { signal });
+        res = await fetch(url, { signal });
       } catch (e) {
         if (attempt === 2) throw new Error('Network error while downloading MapTiler tiles.');
         continue;
@@ -180,7 +217,14 @@
         err.auth = true;
         throw err;
       }
-      if (res.ok) return gunzipIfNeeded(new Uint8Array(await res.arrayBuffer()));
+      if (res.ok) {
+        const buf = await gunzipIfNeeded(new Uint8Array(await res.arrayBuffer()));
+        // A text/HTML answer instead of a vector tile: surface what the server said.
+        if (buf.length && (buf[0] === 0x3c || buf[0] === 0x7b)) {
+          throw new Error(`MapTiler sent text instead of map data: "${snippet(new TextDecoder().decode(buf.subarray(0, 600)))}"`);
+        }
+        return buf;
+      }
       await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
     }
     throw new Error('MapTiler tile download failed repeatedly.');
@@ -197,6 +241,7 @@
   /* Load features for a lon/lat bbox. Returns raw data in global tile-pixel coordinates
      plus a toLonLat function; use projectRaw() to convert to millimetres. */
   async function load(bbox, opts, key, onStatus) {
+    await tileTemplate(key); // resolve the tile URL (and validate the key) once up front
     const t = pickZoom(bbox, opts.maxTiles || 64);
     const tiles = [];
     for (let x = t.x0; x <= t.x1; x++) for (let y = t.y0; y <= t.y1; y++) tiles.push([x, y]);
