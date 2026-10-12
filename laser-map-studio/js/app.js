@@ -343,10 +343,12 @@
     if (!key) return setStatus('Paste a MapTiler API key first.', 'error');
     setStatus('Checking key…');
     try {
-      await window.LMS.mvt.testKey(key);
-      setStatus('MapTiler key works.', 'ok');
+      const c = map.getCenter().wrap();
+      const r = await window.LMS.mvt.testKey(key, c.lat, c.lng);
+      setStatus(`MapTiler key works – test tile here has ${r.features.toLocaleString()} map features.`, 'ok');
     } catch (e) {
-      setStatus(e.message, 'error');
+      console.error(e);
+      setStatus('MapTiler check failed: ' + e.message, 'error');
     }
   });
   updateSourceInfo();
@@ -415,7 +417,7 @@
         water: s.water !== 'off', waterways: s.waterways !== 'off', roads: s.roads !== 'off', detail,
         rails: s.rails !== 'off', buildings: s.buildings !== 'off', parks: s.parks !== 'off',
       };
-      let data = null, source = '';
+      let data = null, source = '', mtProblem = '';
       const key = getKey();
       if (key) {
         const ck = 'mt|' + JSON.stringify([bbox, feat]);
@@ -432,8 +434,8 @@
           source = `MapTiler, ${res.tiles} tiles at zoom ${res.zoom}` + (res.zoom < 13 && feat.buildings ? ' – too zoomed out for buildings' : '');
         } catch (e) {
           if (e.auth) throw e;
-          console.warn(e);
-          setStatus(`MapTiler failed (${e.message}) – trying the OpenStreetMap servers…`);
+          console.error('MapTiler failed', e);
+          mtProblem = (e.message || String(e)).replace(/\.$/, '');
         }
       }
       if (!data) {
@@ -441,13 +443,14 @@
         let json;
         if (state.cache.query === query) json = state.cache.json;
         else {
-          json = await OSM.fetchOverpass(query, setStatus);
+          json = await OSM.fetchOverpass(query, (msg) =>
+            setStatus(mtProblem ? `MapTiler failed: ${mtProblem}. Falling back – ${msg}` : msg, mtProblem ? 'warn' : ''));
           state.cache = { query, json };
         }
         setStatus(`Processing ${json.elements.length.toLocaleString()} map features…`);
         await tick();
         data = OSM.parse(json, proj);
-        source = 'OpenStreetMap Overpass';
+        source = 'OpenStreetMap Overpass' + (mtProblem ? ` – MapTiler failed: ${mtProblem}` : '');
       }
       const model = build(data, s, setStatus);
       await tick();

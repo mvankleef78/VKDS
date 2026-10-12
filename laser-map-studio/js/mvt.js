@@ -180,10 +180,18 @@
         err.auth = true;
         throw err;
       }
-      if (res.ok) return new Uint8Array(await res.arrayBuffer());
+      if (res.ok) return gunzipIfNeeded(new Uint8Array(await res.arrayBuffer()));
       await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
     }
     throw new Error('MapTiler tile download failed repeatedly.');
+  }
+
+  /* Some servers send tiles still gzip-compressed (without a Content-Encoding header). */
+  async function gunzipIfNeeded(buf) {
+    if (buf.length < 2 || buf[0] !== 0x1f || buf[1] !== 0x8b) return buf;
+    if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack compressed tiles – please update it.');
+    const stream = new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
   }
 
   /* Load features for a lon/lat bbox. Returns raw data in global tile-pixel coordinates
@@ -197,6 +205,7 @@
     const edgeBuildings = [];
     const detail = DETAIL[opts.detail] || DETAIL.all;
     let done = 0, extent = 4096;
+    const badTiles = [];
 
     const ctrl = new AbortController();
     const handle = async ([tx, ty]) => {
@@ -204,7 +213,15 @@
       done++;
       onStatus && onStatus(`Downloading MapTiler tiles… ${done}/${tiles.length}`);
       if (!buf) return;
-      const layers = decodeTile(buf, wanted);
+      let layers;
+      try {
+        layers = decodeTile(buf, wanted);
+      } catch (e) {
+        // one unreadable tile should not sink the whole map
+        console.error(`MapTiler tile ${t.z}/${tx}/${ty} could not be read`, e, buf.subarray(0, 16));
+        badTiles.push(e.message);
+        return;
+      }
       for (const [name, layer] of Object.entries(layers)) {
         const E = layer.extent;
         extent = E;
@@ -277,6 +294,10 @@
       throw e;
     }
 
+    if (badTiles.length && badTiles.length >= tiles.length) {
+      throw new Error(`none of the ${tiles.length} tiles could be read (${badTiles[0]})`);
+    }
+
     // Re-join buildings that were split by tile edges.
     if (edgeBuildings.length) raw.buildings.push(...G.union(edgeBuildings));
 
@@ -304,10 +325,15 @@
     };
   }
 
-  /* Quick key check with a single low-zoom tile. */
-  async function testKey(key) {
-    await fetchTile(0, 0, 0, key);
-    return true;
+  /* Key check: download and decode one detailed tile at the given position. */
+  async function testKey(key, lat, lon) {
+    const n = 2 ** 14;
+    const x = Math.floor(lon2x(lon, n)), y = Math.floor(lat2y(lat, n));
+    const buf = await fetchTile(14, x, y, key);
+    if (!buf) return { layers: 0, features: 0 };
+    const layers = decodeTile(buf);
+    const names = Object.keys(layers);
+    return { layers: names.length, features: names.reduce((a, k) => a + layers[k].features.length, 0) };
   }
 
   root.LMS.mvt = { load, projectRaw, testKey, decodeTile, decodeGeom, ringsToPolygons, pickZoom };
