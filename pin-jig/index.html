@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pin Jig Generator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>Pin Jig Generator</h1>
+      <p class="sub">Jigs for batch UV-printing 3D-printed pins on the xTool Omni small plate</p>
+    </div>
+    <div class="count" id="count">–</div>
+  </header>
+
+  <main class="layout">
+    <form class="panel" id="controls" autocomplete="off" onsubmit="return false">
+
+      <section>
+        <h2><span class="step">1</span> Pin outline</h2>
+        <div class="seg" role="radiogroup" aria-label="Outline source">
+          <label><input type="radio" name="source" value="image" checked> From image</label>
+          <label><input type="radio" name="source" value="model"> From MakerWorld model</label>
+        </div>
+
+        <div data-show="image">
+          <label class="file">
+            <span>Pin image (PNG or JPG)</span>
+            <input type="file" id="tplFile" accept="image/png,image/jpeg,image/webp">
+          </label>
+          <p class="hint">Use the same image you put into MakerWorld's image-to-keychain. A PNG with a transparent background works best.</p>
+          <div class="row">
+            <label>Pin width (mm)<input type="number" id="pinWidth" value="30" min="5" max="160" step="0.1"></label>
+            <label>Detect shape by
+              <select id="maskMode">
+                <option value="auto">Auto</option>
+                <option value="alpha">Transparency</option>
+                <option value="color">Background colour</option>
+              </select>
+            </label>
+          </div>
+          <div class="row">
+            <label>Threshold <output id="thresholdOut">128</output><input type="range" id="threshold" min="1" max="254" value="128"></label>
+            <label>Ignore specks under (mm²)<input type="number" id="minIsland" value="0.5" min="0" step="0.1"></label>
+          </div>
+        </div>
+
+        <div data-show="model" hidden>
+          <label class="file">
+            <span>Pin model (3MF or STL)</span>
+            <input type="file" id="modelFile" accept=".3mf,.stl">
+          </label>
+          <p class="hint">Export a <b>single</b> pin from image-to-keychain. Its exact footprint becomes the pocket shape, so the pockets match the printed pins.</p>
+        </div>
+
+        <p class="info" id="pinInfo"></p>
+      </section>
+
+      <section>
+        <h2><span class="step">2</span> Print artwork</h2>
+        <label class="file">
+          <span>Artwork to UV-print (optional)</span>
+          <input type="file" id="artFile" accept="image/png,image/jpeg,image/webp">
+        </label>
+        <p class="hint">The coloured design, usually without the black border. If you leave this empty, the pin image is used.</p>
+        <div class="row">
+          <label>Placement
+            <select id="artMode">
+              <option value="center">Centred on pin</option>
+              <option value="register">Same canvas as pin image</option>
+            </select>
+          </label>
+          <label>Artwork width (mm)<input type="number" id="artWidth" min="1" step="0.1" placeholder="pin width"></label>
+        </div>
+        <div class="row">
+          <label>Nudge X (mm)<input type="number" id="nudgeX" value="0" step="0.1"></label>
+          <label>Nudge Y (mm)<input type="number" id="nudgeY" value="0" step="0.1"></label>
+        </div>
+        <p class="hint" id="artHint"></p>
+      </section>
+
+      <section>
+        <h2><span class="step">3</span> Jig</h2>
+        <div class="row three">
+          <label>Width (mm)<input type="number" id="jigW" value="165" min="20" step="0.1"></label>
+          <label>Depth (mm)<input type="number" id="jigH" value="122" min="20" step="0.1"></label>
+          <label>Thickness<input type="number" id="jigT" value="2.5" min="0.6" step="0.1"></label>
+        </div>
+        <div class="row three">
+          <label>Pocket depth<input type="number" id="pocketDepth" value="0.5" min="0.1" step="0.1"></label>
+          <label>Clearance<input type="number" id="clearance" value="0.2" min="0" step="0.05"></label>
+          <label>Min. wall<input type="number" id="minWall" value="1" min="0.2" step="0.1"></label>
+        </div>
+        <div class="row">
+          <label>Corner chamfer (mm)<input type="number" id="chamfer" value="3" min="0" step="0.5"></label>
+          <p class="hint tight">The chamfer marks the top-left corner so jig and print never end up rotated 180°. Set 0 to turn it off.</p>
+        </div>
+      </section>
+
+      <section>
+        <h2><span class="step">4</span> Layout</h2>
+        <label class="check"><input type="checkbox" id="autoFit" checked> Fit as many pins as possible</label>
+        <div class="row">
+          <label>Gap between pins (mm)<input type="number" id="gap" value="2" min="0" step="0.1"></label>
+          <label>Jigs on the plate
+            <select id="jigCount"><option value="2" selected>2 (330 × 122)</option><option value="1">1</option></select>
+          </label>
+        </div>
+        <div class="row">
+          <label>Columns<input type="number" id="cols" value="5" min="1" step="1"></label>
+          <label>Rows<input type="number" id="rows" value="3" min="1" step="1"></label>
+        </div>
+        <div class="row">
+          <label>Spacing X (mm, centre to centre)<input type="number" id="sx" value="32" min="1" step="0.1"></label>
+          <label>Spacing Y (mm)<input type="number" id="sy" value="32" min="1" step="0.1"></label>
+        </div>
+        <ul class="issues" id="issues"></ul>
+      </section>
+
+      <section>
+        <h2><span class="step">5</span> Download</h2>
+        <button type="button" class="primary" id="dlJig" disabled>Jig STL <small>print it twice</small></button>
+        <div class="row">
+          <button type="button" id="dlPng" disabled>UV layout PNG</button>
+          <label class="inline">at
+            <select id="dpi"><option>300</option><option selected>600</option><option>1200</option></select> dpi
+          </label>
+        </div>
+        <button type="button" id="dlSvg" disabled>UV layout SVG</button>
+        <button type="button" id="dlPockets" class="ghost" disabled>Pocket shapes SVG <small>for a slicer negative part</small></button>
+      </section>
+    </form>
+
+    <div class="stage">
+      <figure class="card">
+        <figcaption>
+          <span>Plate preview <small id="bedSize"></small></span>
+          <label class="check small"><input type="checkbox" id="showArt" checked> Show artwork</label>
+        </figcaption>
+        <div class="svgwrap"><svg id="bedSvg" role="img" aria-label="Jig layout preview"></svg></div>
+        <p class="legend"><i class="sw jig"></i>Jig <i class="sw pocket"></i>Pocket <i class="sw art"></i>Artwork. The top of the preview is the back of the plate, as in xTool Creative Space.</p>
+      </figure>
+
+      <figure class="card">
+        <figcaption><span>One pin</span></figcaption>
+        <div class="svgwrap pin"><svg id="pinSvg" role="img" aria-label="Pin outline preview"></svg></div>
+        <p class="legend"><i class="sw outline"></i>Pin outline <i class="sw pocket-line"></i>Pocket (outline + clearance)</p>
+      </figure>
+
+      <details class="card howto" open>
+        <summary>Workflow</summary>
+        <ol>
+          <li>Make the pin in MakerWorld image-to-keychain at the same width as here, then print a full plate.</li>
+          <li>Download <b>Jig STL</b> and print it twice, flat, without supports. The pockets are on top.</li>
+          <li>Put both jigs in your frame on the small plate: jig 1 on the left, jig 2 on the right, chamfered corner at the back-left.</li>
+          <li>In xTool Creative Space, import <b>UV layout PNG</b>, then set X 0, Y 0 and width 330 mm (165 mm for one jig). Turn output off for any helper shapes.</li>
+          <li>Scan the plate to check alignment, nudge if needed, then print with colour + gloss varnish.</li>
+        </ol>
+      </details>
+    </div>
+  </main>
+
+  <script src="vendor/clipper.js"></script>
+  <script src="vendor/earcut.min.js"></script>
+  <script src="js/geom.js"></script>
+  <script src="js/trace.js"></script>
+  <script src="js/model-import.js"></script>
+  <script src="js/jig-mesh.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
