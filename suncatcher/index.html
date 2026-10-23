@@ -576,6 +576,16 @@ function parseArtwork(text, name) {
   return { items, warnings, name, autoMode: hasFill ? "silhouette" : "lines" };
 }
 
+function convexHull(pts) {
+  const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (p.length < 3) return p;
+  const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower = [], upper = [];
+  for (const q of p) { while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], q) <= 0) lower.pop(); lower.push(q); }
+  for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], q) <= 0) upper.pop(); upper.push(q); }
+  return lower.slice(0, -1).concat(upper.slice(0, -1));
+}
+
 /* ---------------------------------------------------------------- Auto-bridging of loose pieces */
 const SPECK_MM2 = 2;
 function polyTree(paths) {
@@ -659,30 +669,47 @@ function build() {
   // --- artwork → mm, fitted to design window
   const mode = P.mode === "auto" ? art.autoMode : P.mode;
   const wb = bounds(dWin);
-  const relevant = art.items.filter(it => mode === "lines" || it.fill || (P.useStrokes && it.stroke));
-  let ax0 = Infinity, ay0 = Infinity, ax1 = -Infinity, ay1 = -Infinity;
+  // White shapes that only cut away (e.g. a background rectangle) don't count towards the art's size.
+  const erases = light => light && P.whiteErase;
+  const relevant = art.items.filter(it => mode === "lines" ||
+    (it.fill && !erases(it.fillLight)) || (P.useStrokes && it.stroke && !erases(it.strokeLight)));
+  const artPts = [];
   for (const it of relevant) for (const p of it.paths) {
     if (mode === "lines" && !p.closed) continue;
-    for (const [x, y] of p.pts) { ax0 = Math.min(ax0, x); ax1 = Math.max(ax1, x); ay0 = Math.min(ay0, y); ay1 = Math.max(ay1, y); }
+    for (const q of p.pts) artPts.push(q);
   }
-  if (!isFinite(ax0)) throw new Error(mode === "lines" ? "No closed shapes found to use as cut lines. Try Silhouette mode." : "No filled shapes found. Try Cut-lines mode.");
+  if (!artPts.length) throw new Error(mode === "lines" ? "No closed shapes found to use as cut lines. Try Silhouette mode." : "No filled shapes found. Try Cut-lines mode.");
+  let ax0 = Infinity, ay0 = Infinity, ax1 = -Infinity, ay1 = -Infinity;
+  for (const [x, y] of artPts) { ax0 = Math.min(ax0, x); ax1 = Math.max(ax1, x); ay0 = Math.min(ay0, y); ay1 = Math.max(ay1, y); }
   const rot = +P.rotate, swap = rot === 90 || rot === 270;
   const aw = Math.max(ax1 - ax0, 1e-6), ah = Math.max(ay1 - ay0, 1e-6);
   const acx = (ax0 + ax1) / 2, acy = (ay0 + ay1) / 2;
   const fitW = swap ? ah : aw, fitH = swap ? aw : ah;
-  const z = P.zoom / 100;
-  // Fit 1 mm past the window edge so art that is cropped to its edges overlaps the border.
-  const BLEED = mode === "silhouette" ? 1 : 0;
-  let sx = (wb.w + 2 * BLEED) / fitW, sy = (wb.h + 2 * BLEED) / fitH;
-  if (!P.stretch) sx = sy = Math.min(sx, sy);
-  sx *= z; sy *= z;
-  const wcx = (wb.x0 + wb.x1) / 2 + +P.offX, wcy = (wb.y0 + wb.y1) / 2 + +P.offY;
-  const tf = ([x, y]) => {
+  // Art coordinates centred on the art, after mirror/rotate.
+  const orient = ([x, y]) => {
     let u = x - acx, v = y - acy;
     if (P.mirrorArt) u = -u;
     if (rot === 90) [u, v] = [-v, u]; else if (rot === 180) [u, v] = [-u, -v]; else if (rot === 270) [u, v] = [v, -u];
-    return [wcx + u * sx, wcy + v * sy];
+    return [u, v];
   };
+  // Silhouette art may reach 1 mm past the window edge so art that is cropped to its edges overlaps the border.
+  const BLEED = mode === "silhouette" ? 1 : 0;
+  const fitArea = BLEED ? offset(dWin, BLEED) : dWin;
+  let sx = wb.w / fitW, sy = wb.h / fitH;
+  if (!P.stretch) sx = sy = Math.min(sx, sy);
+  const cx0 = (wb.x0 + wb.x1) / 2, cy0 = (wb.y0 + wb.y1) / 2;
+  // Largest scale at which the art's convex hull still fits inside the window's real shape
+  // (octagon, ellipse, arch…), not just its bounding box.
+  const hull = convexHull(artPts.map(orient));
+  const fitPoly = fitArea.reduce((a, b) => (areaMM2(b) > areaMM2(a) ? b : a));
+  const fits = k => hull.every(([u, v]) => CL.Clipper.PointInPolygon(
+    { X: Math.round((cx0 + u * sx * k) * SC), Y: Math.round((cy0 + v * sy * k) * SC) }, fitPoly) !== 0);
+  let lo = 0, hi = 1.5;
+  for (let it = 0; it < 30; it++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; }
+  const z = P.zoom / 100;
+  sx *= lo * z; sy *= lo * z;
+  const wcx = cx0 + +P.offX, wcy = cy0 + +P.offY;
+  const tf = q => { const [u, v] = orient(q); return [wcx + u * sx, wcy + v * sy]; };
   const sAvg = Math.sqrt(sx * sy);
   const toMM = p => toInt(p.pts.map(tf));
 
