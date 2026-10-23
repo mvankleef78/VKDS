@@ -1,0 +1,926 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Suncatcher Maker</title>
+<style>
+:root {
+  --bg: #f6f2ea;
+  --panel: #fffdf8;
+  --ink: #2b2620;
+  --muted: #7a7064;
+  --line: #e4dccd;
+  --accent: #1a9e92;
+  --accent-ink: #ffffff;
+  --warn: #c2410c;
+  --warn-bg: #fff1e6;
+  --bad: #b91c1c;
+  --bad-bg: #fde8e8;
+  --ok: #15803d;
+  --stage: #ece6da;
+  --cut: #e0201b;
+  --wood: #e8d3b0;
+  --wood-edge: #a88d64;
+  --frame-wood: #dcc39b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1b1916; --panel: #24211d; --ink: #eee7dc; --muted: #a59a8b; --line: #3a352e;
+    --accent: #2bb8aa; --accent-ink: #0f1514; --warn: #fb923c; --warn-bg: #3a2414;
+    --bad: #f87171; --bad-bg: #3b1a1a; --ok: #4ade80; --stage: #2c2924; --cut: #ff4d47;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1b1916; --panel: #24211d; --ink: #eee7dc; --muted: #a59a8b; --line: #3a352e;
+  --accent: #2bb8aa; --accent-ink: #0f1514; --warn: #fb923c; --warn-bg: #3a2414;
+  --bad: #f87171; --bad-bg: #3b1a1a; --ok: #4ade80; --stage: #2c2924; --cut: #ff4d47;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+header {
+  display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+  border-bottom: 1px solid var(--line); background: var(--panel);
+}
+header h1 { font-size: 17px; margin: 0; font-weight: 650; letter-spacing: .2px; }
+header .sub { color: var(--muted); font-size: 13px; }
+header .spacer { flex: 1; }
+.app { display: grid; grid-template-columns: 340px 1fr; height: calc(100% - 53px); }
+aside {
+  overflow-y: auto; border-right: 1px solid var(--line); background: var(--panel);
+  padding: 8px 16px 32px;
+}
+main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+details { border-bottom: 1px solid var(--line); padding: 6px 0; }
+details:last-of-type { border-bottom: 0; }
+summary {
+  cursor: pointer; font-weight: 600; padding: 8px 0; list-style: none;
+  display: flex; align-items: center; justify-content: space-between;
+}
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "▾"; color: var(--muted); transition: transform .15s; }
+details:not([open]) summary::after { transform: rotate(-90deg); }
+.row { display: grid; grid-template-columns: 1fr 96px; align-items: center; gap: 8px; margin: 7px 0; }
+.row.full { grid-template-columns: 1fr; }
+.row label { color: var(--ink); }
+.row small, .hint { color: var(--muted); font-size: 12px; }
+input[type=number], select {
+  width: 100%; padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--bg); color: var(--ink); font: inherit;
+}
+input[type=range] { width: 100%; accent-color: var(--accent); }
+input[type=checkbox] { accent-color: var(--accent); }
+.check { display: flex; gap: 8px; align-items: flex-start; margin: 8px 0; }
+.check input { margin-top: 3px; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button {
+  flex: 1; border: 0; background: transparent; color: var(--ink); padding: 6px 4px; font: inherit;
+  cursor: pointer; border-right: 1px solid var(--line);
+}
+.seg button:last-child { border-right: 0; }
+.seg button.on { background: var(--accent); color: var(--accent-ink); }
+.btn {
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 8px;
+  padding: 7px 12px; font: inherit; cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.drop {
+  border: 2px dashed var(--line); border-radius: 10px; padding: 14px; text-align: center;
+  cursor: pointer; margin: 6px 0 4px; transition: border-color .15s, background .15s;
+}
+.drop.over, .drop:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.drop b { display: block; margin-bottom: 2px; }
+.filename { font-size: 12px; color: var(--muted); word-break: break-all; margin-top: 4px; }
+.swatches { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.swatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--panel); outline: 1px solid var(--line); cursor: pointer; padding: 0; }
+.swatch.on { outline: 2px solid var(--ink); }
+input[type=color] { width: 30px; height: 26px; border: 0; padding: 0; background: none; cursor: pointer; }
+.toolbar {
+  display: flex; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line);
+  background: var(--panel); flex-wrap: wrap;
+}
+.toolbar .spacer { flex: 1; }
+.stage { flex: 1; min-height: 0; background: var(--stage); position: relative; overflow: hidden; }
+.stage svg { width: 100%; height: 100%; display: block; }
+.status { padding: 10px 16px; border-top: 1px solid var(--line); background: var(--panel); max-height: 32%; overflow-y: auto; }
+.stats { display: flex; gap: 18px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
+.stats b { color: var(--ink); font-weight: 600; }
+.msgs { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.msgs li { padding: 6px 10px; border-radius: 6px; font-size: 13px; }
+.msgs li.warn { background: var(--warn-bg); color: var(--warn); }
+.msgs li.bad { background: var(--bad-bg); color: var(--bad); }
+.msgs li.ok { color: var(--ok); padding-left: 0; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); align-items: center; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; }
+.busy { position: absolute; top: 10px; right: 12px; font-size: 12px; color: var(--muted); display: none; }
+.busy.on { display: block; }
+@media (max-width: 820px) {
+  .app { grid-template-columns: 1fr; height: auto; }
+  aside { border-right: 0; border-top: 1px solid var(--line); }
+  main { order: -1; }
+  .stage { height: 70vh; flex: none; }
+  header { padding: 12px 16px; }
+  header .sub { display: none; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>☀ Suncatcher Maker</h1>
+  <span class="sub">Turn any SVG into laser-cut layers: front · frame · back</span>
+  <span class="spacer"></span>
+  <button class="btn" id="themeBtn" title="Toggle light/dark">Light / dark</button>
+</header>
+
+<div class="app">
+<aside>
+  <details open>
+    <summary>1 · Artwork</summary>
+    <div class="drop" id="drop" tabindex="0">
+      <b>Drop an SVG here</b>
+      <span class="hint">or click to choose a file</span>
+      <input type="file" id="file" accept=".svg,image/svg+xml" hidden>
+    </div>
+    <div class="filename" id="fileName">Demo: butterfly</div>
+    <div class="row full">
+      <label>Interpret artwork as</label>
+      <div class="seg" id="modeSeg">
+        <button data-v="auto">Auto</button>
+        <button data-v="silhouette">Silhouette</button>
+        <button data-v="lines">Cut lines</button>
+      </div>
+      <small id="modeHint"></small>
+    </div>
+    <label class="check"><input type="checkbox" id="invert"> <span>Invert (swap wood and openings)</span></label>
+    <label class="check"><input type="checkbox" id="whiteErase" checked> <span>White shapes cut away <small>(silhouette)</small></span></label>
+    <label class="check"><input type="checkbox" id="useStrokes" checked> <span>Count strokes as wood <small>(silhouette)</small></span></label>
+    <div class="row"><label>Zoom <small>%</small></label><input type="number" id="zoom" min="10" max="400" step="1"></div>
+    <div class="row"><label>Shift X <small>mm</small></label><input type="number" id="offX" step="0.5"></div>
+    <div class="row"><label>Shift Y <small>mm</small></label><input type="number" id="offY" step="0.5"></div>
+    <div class="row"><label>Rotate</label>
+      <select id="rotate"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></div>
+    <label class="check"><input type="checkbox" id="mirrorArt"> <span>Mirror artwork</span></label>
+    <label class="check"><input type="checkbox" id="stretch"> <span>Stretch to fill window <small>(ignore aspect ratio)</small></span></label>
+  </details>
+
+  <details open>
+    <summary>2 · Shape &amp; size</summary>
+    <div class="row"><label>Shape</label>
+      <select id="shape">
+        <option value="rect">Rounded rectangle</option>
+        <option value="ellipse">Circle / ellipse</option>
+        <option value="arch">Arch (church window)</option>
+        <option value="hexagon">Hexagon</option>
+        <option value="octagon">Octagon</option>
+      </select></div>
+    <div class="row"><label>Width <small>mm</small></label><input type="number" id="width" min="30" max="600" step="1"></div>
+    <div class="row"><label>Height <small>mm</small></label><input type="number" id="height" min="30" max="600" step="1"></div>
+    <div class="row"><label>Corner radius <small>mm</small></label><input type="number" id="radius" min="0" max="100" step="0.5"></div>
+  </details>
+
+  <details open>
+    <summary>3 · Borders &amp; glass</summary>
+    <div class="row"><label>Design border <small>mm</small></label><input type="number" id="designBorder" min="2" max="60" step="0.5"></div>
+    <div class="row"><label>Frame border <small>mm</small></label><input type="number" id="frameBorder" min="1" max="60" step="0.5"></div>
+    <p class="hint">The glass sits in the frame window and is held by the overlap: design border − frame border.</p>
+    <div class="row"><label>Glass clearance <small>mm</small></label><input type="number" id="glassClear" min="0" max="3" step="0.05"></div>
+    <div class="row"><label>Frame layers</label>
+      <select id="frameCount"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+    <label class="check"><input type="checkbox" id="mirrorBack" checked> <span>Mirror back layer <small>(lines up when flipped)</small></span></label>
+  </details>
+
+  <details open>
+    <summary>4 · Hanger</summary>
+    <div class="row full">
+      <div class="seg" id="hangSeg">
+        <button data-v="0">None</button>
+        <button data-v="1">One loop</button>
+        <button data-v="2">Two loops</button>
+      </div>
+    </div>
+    <div class="row"><label>Loop spacing <small>mm</small></label><input type="number" id="loopSpacing" min="5" max="500" step="0.5"></div>
+    <div class="row"><label>Loop outer Ø <small>mm</small></label><input type="number" id="loopD" min="4" max="60" step="0.1"></div>
+    <div class="row"><label>Hole Ø <small>mm</small></label><input type="number" id="holeD" min="1" max="50" step="0.1"></div>
+    <div class="row"><label>Sticks out <small>mm</small></label><input type="number" id="loopOut" min="1" max="60" step="0.5"></div>
+    <div class="row"><label>Notch clearance <small>mm</small></label><input type="number" id="notchClear" min="0" max="5" step="0.1"></div>
+    <label class="check"><input type="checkbox" id="loopsAll"> <span>Loops on every layer <small>(otherwise frame only)</small></span></label>
+  </details>
+
+  <details>
+    <summary>5 · Checks &amp; export</summary>
+    <div class="row"><label>Min. wood width <small>mm</small></label><input type="number" id="minWidth" min="0" max="10" step="0.1"></div>
+    <div class="row"><label>Bed width <small>mm</small></label><input type="number" id="bedWidth" min="50" max="2000" step="1"></div>
+    <div class="row"><label>Gap between parts <small>mm</small></label><input type="number" id="gap" min="0" max="50" step="0.5"></div>
+    <div class="row full"><label>Include in file</label></div>
+    <label class="check"><input type="checkbox" id="incFront" checked> <span>Front design</span></label>
+    <label class="check"><input type="checkbox" id="incFrame" checked> <span>Frame(s)</span></label>
+    <label class="check"><input type="checkbox" id="incBack" checked> <span>Back design</span></label>
+    <label class="check"><input type="checkbox" id="incGlass"> <span>Glass / acrylic template <small>(blue)</small></span></label>
+    <p><button class="btn" id="resetBtn">Reset to defaults</button></p>
+  </details>
+</aside>
+
+<main>
+  <div class="toolbar">
+    <div class="seg" id="viewSeg" style="min-width:220px">
+      <button data-v="preview">Preview</button>
+      <button data-v="layout">Laser layout</button>
+    </div>
+    <div class="swatches" id="glassSwatches" title="Glass colour"></div>
+    <span class="legend" id="layoutLegend"><span><i style="background:var(--cut)"></i>cut</span><span><i style="background:#f59e0b88"></i>too thin</span><span><i style="background:#ef444466"></i>loose piece</span></span>
+    <span class="spacer"></span>
+    <button class="btn primary" id="downloadBtn">Download SVG</button>
+  </div>
+  <div class="stage" id="stage"><div class="busy" id="busy">Calculating…</div></div>
+  <div class="status">
+    <div class="stats" id="stats"></div>
+    <ul class="msgs" id="msgs"></ul>
+  </div>
+</main>
+</div>
+
+<div id="sandbox" style="position:absolute;left:-20000px;top:0;width:1000px;height:1000px;overflow:hidden;pointer-events:none" aria-hidden="true"></div>
+
+<script src="clipper.js"></script>
+<script src="demo-butterfly.js"></script>
+<script>
+"use strict";
+const CL = ClipperLib;
+const SC = 1000;                 // Clipper integer units per mm
+const ARC_TOL = 0.02 * SC;       // max deviation for round offsets (mm * SC)
+
+const DEFAULTS = {
+  mode: "auto", invert: false, whiteErase: true, useStrokes: true,
+  zoom: 100, offX: 0, offY: 0, rotate: "0", mirrorArt: false, stretch: false,
+  shape: "rect", width: 120, height: 120, radius: 10,
+  designBorder: 10, frameBorder: 7.5, glassClear: 0.25, frameCount: "1", mirrorBack: true,
+  hang: "2", loopSpacing: 69.5, loopD: 17.3, holeD: 10, loopOut: 10, notchClear: 0.5, loopsAll: false,
+  minWidth: 1, bedWidth: 400, gap: 3,
+  incFront: true, incFrame: true, incBack: true, incGlass: false,
+  view: "preview", glass: "#16b5a5",
+};
+const GLASS_COLORS = ["#16b5a5", "#2f7de1", "#7c4dce", "#e0457b", "#e8412c", "#f39c12", "#f2d024", "#3fae49"];
+const STORE_KEY = "suncatcher-maker-v1";
+
+let P = Object.assign({}, DEFAULTS);
+try { Object.assign(P, JSON.parse(localStorage.getItem(STORE_KEY) || "{}")); } catch (e) {}
+let art = null;       // parsed artwork {items, warnings, name}
+let result = null;    // last computed geometry
+
+/* ---------------------------------------------------------------- Clipper helpers */
+function exec(ct, subj, clip, ft) {
+  const c = new CL.Clipper();
+  c.AddPaths(subj, CL.PolyType.ptSubject, true);
+  if (clip) c.AddPaths(clip, CL.PolyType.ptClip, true);
+  const out = new CL.Paths();
+  ft = ft === undefined ? CL.PolyFillType.pftNonZero : ft;
+  c.Execute(ct, out, ft, ft);
+  return out;
+}
+const union = (a, b) => exec(CL.ClipType.ctUnion, a, b || []);
+const diff = (a, b) => exec(CL.ClipType.ctDifference, a, b);
+const inter = (a, b) => exec(CL.ClipType.ctIntersection, a, b);
+function offset(paths, d, open) {
+  if (!paths.length) return [];
+  const co = new CL.ClipperOffset(2, ARC_TOL);
+  co.AddPaths(paths, CL.JoinType.jtRound, open ? CL.EndType.etOpenRound : CL.EndType.etClosedPolygon);
+  const out = new CL.Paths();
+  co.Execute(out, d * SC);
+  return out;
+}
+const toInt = pts => pts.map(p => ({ X: Math.round(p[0] * SC), Y: Math.round(p[1] * SC) }));
+const areaMM2 = path => Math.abs(CL.Clipper.Area(path)) / (SC * SC);
+function bounds(paths) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const p of paths) for (const q of p) {
+    if (q.X < x0) x0 = q.X; if (q.X > x1) x1 = q.X; if (q.Y < y0) y0 = q.Y; if (q.Y > y1) y1 = q.Y;
+  }
+  return { x0: x0 / SC, y0: y0 / SC, x1: x1 / SC, y1: y1 / SC, w: (x1 - x0) / SC, h: (y1 - y0) / SC };
+}
+const mapPaths = (paths, fn) => paths.map(p => p.map(q => fn(q)));
+const translate = (paths, dx, dy) => mapPaths(paths, q => ({ X: q.X + Math.round(dx * SC), Y: q.Y + Math.round(dy * SC) }));
+const mirrorX = paths => mapPaths(paths, q => ({ X: -q.X, Y: q.Y })).map(p => p.reverse());
+function perimeterMM(paths) {
+  let s = 0;
+  for (const p of paths) for (let i = 0; i < p.length; i++) {
+    const a = p[i], b = p[(i + 1) % p.length];
+    s += Math.hypot(b.X - a.X, b.Y - a.Y);
+  }
+  return s / SC;
+}
+function circle(cx, cy, r) {
+  const n = Math.max(48, Math.ceil(2 * Math.PI * r / 0.3));
+  const pts = [];
+  for (let i = 0; i < n; i++) { const a = 2 * Math.PI * i / n; pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); }
+  return toInt(pts);
+}
+// Removes everything thinner than w (morphological opening).
+const opening = (paths, w) => offset(offset(paths, -w / 2), w / 2);
+const closing = (paths, w) => offset(offset(paths, w / 2), -w / 2);
+
+/* ---------------------------------------------------------------- Outline shapes (mm, centred on 0,0) */
+function shapeOutline(type, W, H, R) {
+  let pts = [];
+  const poly = (n, start) => {
+    const raw = [];
+    for (let i = 0; i < n; i++) { const a = start + 2 * Math.PI * i / n; raw.push([Math.cos(a), Math.sin(a)]); }
+    const xs = raw.map(p => p[0]), ys = raw.map(p => p[1]);
+    const mx = Math.max(...xs) - Math.min(...xs), my = Math.max(...ys) - Math.min(...ys);
+    return raw.map(p => [p[0] / mx * W, p[1] / my * H]);
+  };
+  if (type === "ellipse") {
+    const n = 360;
+    for (let i = 0; i < n; i++) { const a = 2 * Math.PI * i / n; pts.push([W / 2 * Math.cos(a), H / 2 * Math.sin(a)]); }
+    return [toInt(pts)];
+  }
+  if (type === "hexagon") pts = poly(6, 0);
+  else if (type === "octagon") pts = poly(8, Math.PI / 8);
+  else if (type === "arch") {
+    const ry = Math.min(W / 2, H / 2);
+    const top = -H / 2 + ry;
+    pts.push([W / 2, H / 2], [-W / 2, H / 2]);
+    for (let i = 0; i <= 180; i++) { const a = Math.PI - Math.PI * i / 180; pts.push([W / 2 * Math.cos(a), top - ry * Math.sin(a)]); }
+  } else pts = [[-W / 2, -H / 2], [W / 2, -H / 2], [W / 2, H / 2], [-W / 2, H / 2]];
+  let out = [toInt(pts)];
+  const r = Math.min(R, W / 2 - 0.01, H / 2 - 0.01);
+  if (r > 0.01) out = offset(offset(out, -r), r);
+  return out;
+}
+// Topmost y of the outline at a given x (vertical ray cast).
+function topAt(paths, x) {
+  const X = x * SC; let best = Infinity;
+  for (const p of paths) for (let i = 0; i < p.length; i++) {
+    const a = p[i], b = p[(i + 1) % p.length];
+    if ((a.X <= X && b.X >= X) || (b.X <= X && a.X >= X)) {
+      const t = b.X === a.X ? 0 : (X - a.X) / (b.X - a.X);
+      best = Math.min(best, a.Y + t * (b.Y - a.Y));
+    }
+  }
+  return best / SC;
+}
+
+/* ---------------------------------------------------------------- SVG parsing */
+function sanitize(doc) {
+  doc.querySelectorAll("script, foreignObject, iframe").forEach(n => n.remove());
+  doc.querySelectorAll("*").forEach(el => {
+    for (const a of [...el.attributes]) if (/^on/i.test(a.name)) el.removeAttribute(a.name);
+  });
+}
+function expandUses(root) {
+  for (let pass = 0; pass < 8; pass++) {
+    const uses = root.querySelectorAll("use");
+    if (!uses.length) return;
+    uses.forEach(u => {
+      const href = u.getAttribute("href") || u.getAttributeNS("http://www.w3.org/1999/xlink", "href") || "";
+      const target = href.startsWith("#") ? root.querySelector(`[id="${CSS.escape(href.slice(1))}"]`) : null;
+      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      for (const a of u.attributes) if (!/^(x|y|width|height|href|xlink:href)$/.test(a.name)) g.setAttribute(a.name, a.value);
+      const tx = parseFloat(u.getAttribute("x") || 0), ty = parseFloat(u.getAttribute("y") || 0);
+      g.setAttribute("transform", (u.getAttribute("transform") || "") + ` translate(${tx} ${ty})`);
+      if (target) {
+        const clone = target.cloneNode(true);
+        clone.removeAttribute("id");
+        if (clone.tagName === "symbol") { while (clone.firstChild) g.appendChild(clone.firstChild); }
+        else g.appendChild(clone);
+      }
+      u.replaceWith(g);
+    });
+  }
+}
+
+function tokenizePath(d) {
+  return d.match(/[a-zA-Z]|[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?/g) || [];
+}
+// Flattens path data to polylines; tol = max chord error in local units.
+function flattenPath(d, tol) {
+  const t = tokenizePath(d);
+  const subs = [];
+  let i = 0, cmd = "", x = 0, y = 0, sx = 0, sy = 0, lcx = 0, lcy = 0, lqx = 0, lqy = 0, prev = "";
+  let cur = null;
+  const isCmd = s => /^[a-zA-Z]$/.test(s);
+  const num = () => { const v = parseFloat(t[i++]); if (isNaN(v)) throw new Error("bad number"); return v; };
+  const flag = () => {
+    const s = t[i];
+    if (s.length > 1 && (s[0] === "0" || s[0] === "1")) { t[i] = s.slice(1); return s[0] === "1"; }
+    i++; return s === "1";
+  };
+  const ensure = () => { if (!cur) { cur = { pts: [[x, y]], closed: false }; subs.push(cur); } };
+  const lineTo = (nx, ny) => { ensure(); cur.pts.push([nx, ny]); x = nx; y = ny; };
+  const cubic = (x1, y1, x2, y2, x3, y3) => {
+    ensure();
+    const L = Math.hypot(x1 - x, y1 - y) + Math.hypot(x2 - x1, y2 - y1) + Math.hypot(x3 - x2, y3 - y2);
+    const n = Math.min(256, Math.max(2, Math.ceil(Math.sqrt(L / tol) * 0.7)));
+    const x0 = x, y0 = y;
+    for (let k = 1; k <= n; k++) {
+      const s = k / n, u = 1 - s;
+      cur.pts.push([u * u * u * x0 + 3 * u * u * s * x1 + 3 * u * s * s * x2 + s * s * s * x3,
+                    u * u * u * y0 + 3 * u * u * s * y1 + 3 * u * s * s * y2 + s * s * s * y3]);
+    }
+    x = x3; y = y3;
+  };
+  const quad = (x1, y1, x2, y2) => cubic(x + 2 / 3 * (x1 - x), y + 2 / 3 * (y1 - y), x2 + 2 / 3 * (x1 - x2), y2 + 2 / 3 * (y1 - y2), x2, y2);
+  const arc = (rx, ry, phi, large, sweep, x2, y2) => {
+    ensure();
+    rx = Math.abs(rx); ry = Math.abs(ry);
+    if (!rx || !ry || (x === x2 && y === y2)) { lineTo(x2, y2); return; }
+    const c = Math.cos(phi), s = Math.sin(phi);
+    const dx = (x - x2) / 2, dy = (y - y2) / 2;
+    const x1p = c * dx + s * dy, y1p = -s * dx + c * dy;
+    const lam = x1p * x1p / (rx * rx) + y1p * y1p / (ry * ry);
+    if (lam > 1) { rx *= Math.sqrt(lam); ry *= Math.sqrt(lam); }
+    const num2 = rx * rx * ry * ry - rx * rx * y1p * y1p - ry * ry * x1p * x1p;
+    const den = rx * rx * y1p * y1p + ry * ry * x1p * x1p;
+    let co = Math.sqrt(Math.max(0, num2 / den)); if (large === sweep) co = -co;
+    const cxp = co * rx * y1p / ry, cyp = -co * ry * x1p / rx;
+    const cx = c * cxp - s * cyp + (x + x2) / 2, cy = s * cxp + c * cyp + (y + y2) / 2;
+    const ang = (ux, uy, vx, vy) => Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+    const th1 = ang(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry);
+    let dth = ang((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry);
+    if (!sweep && dth > 0) dth -= 2 * Math.PI; else if (sweep && dth < 0) dth += 2 * Math.PI;
+    const r = Math.max(rx, ry);
+    const step = 2 * Math.acos(Math.max(-1, Math.min(1, 1 - tol / r))) || 0.1;
+    const n = Math.min(512, Math.max(2, Math.ceil(Math.abs(dth) / step)));
+    for (let k = 1; k <= n; k++) {
+      const a = th1 + dth * k / n;
+      const px = rx * Math.cos(a), py = ry * Math.sin(a);
+      cur.pts.push([c * px - s * py + cx, s * px + c * py + cy]);
+    }
+    x = x2; y = y2;
+  };
+  while (i < t.length) {
+    if (isCmd(t[i])) cmd = t[i++];
+    else if (!cmd || /[zZ]/.test(cmd)) break;
+    const rel = cmd !== cmd.toUpperCase(), C = cmd.toUpperCase();
+    const ox = rel ? x : 0, oy = rel ? y : 0;
+    switch (C) {
+      case "M": {
+        const nx = num() + ox, ny = num() + oy;
+        cur = { pts: [[nx, ny]], closed: false }; subs.push(cur);
+        x = sx = nx; y = sy = ny; cmd = rel ? "l" : "L"; break;
+      }
+      case "L": lineTo(num() + ox, num() + oy); break;
+      case "H": lineTo(num() + ox, y); break;
+      case "V": lineTo(x, num() + oy); break;
+      case "C": { const a = num() + ox, b = num() + oy, c2 = num() + ox, d2 = num() + oy, e = num() + ox, f = num() + oy; cubic(a, b, c2, d2, e, f); lcx = c2; lcy = d2; break; }
+      case "S": {
+        const r1x = /[CS]/.test(prev) ? 2 * x - lcx : x, r1y = /[CS]/.test(prev) ? 2 * y - lcy : y;
+        const c2 = num() + ox, d2 = num() + oy, e = num() + ox, f = num() + oy; cubic(r1x, r1y, c2, d2, e, f); lcx = c2; lcy = d2; break;
+      }
+      case "Q": { const a = num() + ox, b = num() + oy, e = num() + ox, f = num() + oy; quad(a, b, e, f); lqx = a; lqy = b; break; }
+      case "T": {
+        const a = /[QT]/.test(prev) ? 2 * x - lqx : x, b = /[QT]/.test(prev) ? 2 * y - lqy : y;
+        const e = num() + ox, f = num() + oy; quad(a, b, e, f); lqx = a; lqy = b; break;
+      }
+      case "A": { const rx = num(), ry = num(), ph = num() * Math.PI / 180, la = flag(), sw = flag(); const e = num() + ox, f = num() + oy; arc(rx, ry, ph, la, sw, e, f); break; }
+      case "Z": if (cur) cur.closed = true; x = sx; y = sy; cur = null; break;
+      default: i = t.length;
+    }
+    prev = C;
+  }
+  return subs;
+}
+function shapeToD(el) {
+  const v = n => { const a = el[n]; return a && a.baseVal ? a.baseVal.value : parseFloat(el.getAttribute(n) || 0); };
+  switch (el.tagName.toLowerCase()) {
+    case "path": return el.getAttribute("d") || "";
+    case "rect": {
+      const x = v("x"), y = v("y"), w = v("width"), h = v("height");
+      let rx = el.hasAttribute("rx") ? v("rx") : null, ry = el.hasAttribute("ry") ? v("ry") : null;
+      if (rx === null) rx = ry || 0; if (ry === null) ry = rx;
+      rx = Math.min(rx, w / 2); ry = Math.min(ry, h / 2);
+      if (!rx || !ry) return `M${x} ${y}H${x + w}V${y + h}H${x}Z`;
+      return `M${x + rx} ${y}H${x + w - rx}A${rx} ${ry} 0 0 1 ${x + w} ${y + ry}V${y + h - ry}A${rx} ${ry} 0 0 1 ${x + w - rx} ${y + h}H${x + rx}A${rx} ${ry} 0 0 1 ${x} ${y + h - ry}V${y + ry}A${rx} ${ry} 0 0 1 ${x + rx} ${y}Z`;
+    }
+    case "circle": case "ellipse": {
+      const cx = v("cx"), cy = v("cy");
+      const rx = el.tagName === "circle" ? v("r") : v("rx"), ry = el.tagName === "circle" ? v("r") : v("ry");
+      return `M${cx - rx} ${cy}A${rx} ${ry} 0 1 0 ${cx + rx} ${cy}A${rx} ${ry} 0 1 0 ${cx - rx} ${cy}Z`;
+    }
+    case "line": return `M${v("x1")} ${v("y1")}L${v("x2")} ${v("y2")}`;
+    case "polyline": case "polygon": {
+      const n = (el.getAttribute("points") || "").trim().split(/[\s,]+/).map(Number);
+      if (n.length < 4) return "";
+      let d = `M${n[0]} ${n[1]}`;
+      for (let k = 2; k + 1 < n.length; k += 2) d += `L${n[k]} ${n[k + 1]}`;
+      return el.tagName === "polygon" ? d + "Z" : d;
+    }
+  }
+  return "";
+}
+function parseColor(str) {
+  const m = /rgba?\(([^)]+)\)/.exec(str || "");
+  if (!m) return null;
+  const [r, g, b, a] = m[1].split(/[\s,\/]+/).map(Number);
+  return { r, g, b, a: a === undefined ? 1 : a };
+}
+const isLight = c => c && (0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b) / 255 > 0.85;
+
+function parseArtwork(text, name) {
+  const doc = new DOMParser().parseFromString(text, "image/svg+xml");
+  if (doc.querySelector("parsererror") || doc.documentElement.tagName.toLowerCase() !== "svg")
+    throw new Error("This file is not a valid SVG.");
+  sanitize(doc);
+  const sandbox = document.getElementById("sandbox");
+  sandbox.innerHTML = "";
+  const svg = document.importNode(doc.documentElement, true);
+  sandbox.appendChild(svg);
+  expandUses(svg);
+  const warnings = [];
+  if (svg.querySelector("text")) warnings.push("The SVG contains text. Convert text to paths in your design program, otherwise it is skipped.");
+  if (svg.querySelector("image")) warnings.push("The SVG contains embedded raster images; those are skipped. Use a traced/vector version.");
+
+  const rootInv = svg.getScreenCTM().inverse();
+  let bb; try { bb = svg.getBBox(); } catch (e) { bb = { width: 100, height: 100 }; }
+  const baseTol = Math.max(bb.width, bb.height, 1) / 3000;
+  const items = [];
+  const skip = "defs, clipPath, mask, symbol, pattern, marker, linearGradient, radialGradient, filter, metadata, title, desc";
+  svg.querySelectorAll("path, rect, circle, ellipse, line, polyline, polygon").forEach(el => {
+    if (el.closest(skip)) return;
+    const cs = getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden" || +cs.opacity === 0) return;
+    const d = shapeToD(el);
+    if (!d) return;
+    const m = rootInv.multiply(el.getScreenCTM());
+    const det = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)) || 1;
+    let subs;
+    try { subs = flattenPath(d, baseTol / det); } catch (e) { return; }
+    const paths = subs.filter(s => s.pts.length >= 2).map(s => {
+      const pts = s.pts.map(([px, py]) => [m.a * px + m.c * py + m.e, m.b * px + m.d * py + m.f]);
+      const a = pts[0], b = pts[pts.length - 1];
+      const closed = s.closed || Math.hypot(a[0] - b[0], a[1] - b[1]) < baseTol * 4;
+      return { pts, closed };
+    });
+    if (!paths.length) return;
+    const fillC = cs.fill === "none" || +cs.fillOpacity === 0 ? null : (parseColor(cs.fill) || { r: 0, g: 0, b: 0, a: 1 });
+    const strokeC = cs.stroke === "none" || +cs.strokeOpacity === 0 ? null : (parseColor(cs.stroke) || { r: 0, g: 0, b: 0, a: 1 });
+    if (fillC && fillC.a === 0) return;
+    items.push({
+      paths, fill: !!fillC, fillLight: isLight(fillC), evenodd: cs.fillRule === "evenodd",
+      stroke: !!strokeC && parseFloat(cs.strokeWidth) > 0, strokeLight: isLight(strokeC),
+      strokeWidth: (parseFloat(cs.strokeWidth) || 0) * det,
+    });
+  });
+  sandbox.innerHTML = "";
+  if (!items.length) throw new Error("No usable shapes were found in this SVG.");
+  const hasFill = items.some(it => it.fill && !it.fillLight);
+  return { items, warnings, name, autoMode: hasFill ? "silhouette" : "lines" };
+}
+
+/* ---------------------------------------------------------------- Build suncatcher */
+function build() {
+  const msgs = [];
+  const W = +P.width, H = +P.height;
+  const outer = shapeOutline(P.shape, W, H, +P.radius);
+  const dWin = offset(outer, -P.designBorder);
+  const fWin = offset(outer, -P.frameBorder);
+  if (!dWin.length) throw new Error("Design border is too wide for this size.");
+  if (+P.frameBorder >= +P.designBorder) msgs.push(["bad", "Frame border must be smaller than the design border, otherwise nothing holds the glass in place."]);
+  else if (P.designBorder - P.frameBorder < 1.5) msgs.push(["warn", `The glass is only held by ${(P.designBorder - P.frameBorder).toFixed(1)} mm of overlap; 2 mm or more is safer.`]);
+
+  // --- artwork → mm, fitted to design window
+  const mode = P.mode === "auto" ? art.autoMode : P.mode;
+  const wb = bounds(dWin);
+  const relevant = art.items.filter(it => mode === "lines" || it.fill || (P.useStrokes && it.stroke));
+  let ax0 = Infinity, ay0 = Infinity, ax1 = -Infinity, ay1 = -Infinity;
+  for (const it of relevant) for (const p of it.paths) {
+    if (mode === "lines" && !p.closed) continue;
+    for (const [x, y] of p.pts) { ax0 = Math.min(ax0, x); ax1 = Math.max(ax1, x); ay0 = Math.min(ay0, y); ay1 = Math.max(ay1, y); }
+  }
+  if (!isFinite(ax0)) throw new Error(mode === "lines" ? "No closed shapes found to use as cut lines. Try Silhouette mode." : "No filled shapes found. Try Cut-lines mode.");
+  const rot = +P.rotate, swap = rot === 90 || rot === 270;
+  const aw = Math.max(ax1 - ax0, 1e-6), ah = Math.max(ay1 - ay0, 1e-6);
+  const acx = (ax0 + ax1) / 2, acy = (ay0 + ay1) / 2;
+  const fitW = swap ? ah : aw, fitH = swap ? aw : ah;
+  const z = P.zoom / 100;
+  let sx = wb.w / fitW, sy = wb.h / fitH;
+  if (!P.stretch) sx = sy = Math.min(sx, sy);
+  sx *= z; sy *= z;
+  const wcx = (wb.x0 + wb.x1) / 2 + +P.offX, wcy = (wb.y0 + wb.y1) / 2 + +P.offY;
+  const tf = ([x, y]) => {
+    let u = x - acx, v = y - acy;
+    if (P.mirrorArt) u = -u;
+    if (rot === 90) [u, v] = [-v, u]; else if (rot === 180) [u, v] = [-u, -v]; else if (rot === 270) [u, v] = [v, -u];
+    return [wcx + u * sx, wcy + v * sy];
+  };
+  const sAvg = Math.sqrt(sx * sy);
+  const toMM = p => toInt(p.pts.map(tf));
+
+  let wood; // wood of the artwork, before clipping to the window
+  if (mode === "lines") {
+    const contours = [];
+    let open = 0;
+    for (const it of art.items) for (const p of it.paths) { if (p.closed && p.pts.length > 2) contours.push(toMM(p)); else open++; }
+    if (open) msgs.push(["warn", `${open} open line${open > 1 ? "s were" : " was"} ignored; only closed shapes become cut-outs.`]);
+    const holes = CL.Clipper.SimplifyPolygons(contours, CL.PolyFillType.pftEvenOdd);
+    wood = diff(dWin, holes);
+  } else {
+    let acc = [], batch = [];
+    const flush = () => { if (batch.length) { acc = union(acc, batch); batch = []; } };
+    for (const it of art.items) {
+      if (it.fill) {
+        const closed = it.paths.filter(p => p.pts.length > 2).map(toMM);
+        const reg = CL.Clipper.SimplifyPolygons(closed, it.evenodd ? CL.PolyFillType.pftEvenOdd : CL.PolyFillType.pftNonZero);
+        if (it.fillLight && P.whiteErase) { flush(); acc = diff(acc, reg); } else if (!it.fillLight || !P.whiteErase) batch.push(...reg);
+      }
+      if (P.useStrokes && it.stroke) {
+        const w = it.strokeWidth * sAvg;
+        if (w > 0.01) {
+          const co = new CL.ClipperOffset(2, ARC_TOL);
+          for (const p of it.paths) co.AddPath(toMM(p), CL.JoinType.jtRound, p.closed ? CL.EndType.etClosedLine : CL.EndType.etOpenRound);
+          const reg = new CL.Paths(); co.Execute(reg, w / 2 * SC);
+          if (it.strokeLight && P.whiteErase) { flush(); acc = diff(acc, reg); } else batch.push(...reg);
+        }
+      }
+    }
+    flush();
+    wood = acc;
+  }
+  if (P.invert) wood = diff(dWin, wood);
+
+  // --- hangers
+  const loops = [], holes = [], notches = [];
+  const n = +P.hang;
+  if (n > 0) {
+    const R = P.loopD / 2, r = P.holeD / 2;
+    if (r >= R - 0.5) msgs.push(["bad", "Hole is as big as the loop: the loop ring would break. Make the loop larger or the hole smaller."]);
+    else if (R - r < 2) msgs.push(["warn", `Loop ring is only ${(R - r).toFixed(1)} mm wide; it may snap.`]);
+    const xs = n === 1 ? [0] : [-P.loopSpacing / 2, P.loopSpacing / 2];
+    for (const x of xs) {
+      const yt = topAt(outer, x);
+      if (!isFinite(yt)) { msgs.push(["bad", "A hanging loop falls outside the shape; reduce the loop spacing."]); continue; }
+      const cy = yt - P.loopOut + R;
+      let colBottom = yt;
+      for (let k = -4; k <= 4; k++) { const v = topAt(outer, x + R * k / 4); if (isFinite(v)) colBottom = Math.max(colBottom, v); }
+      const rect = toInt([[x - R, cy], [x + R, cy], [x + R, colBottom + 1], [x - R, colBottom + 1]]);
+      loops.push(...union([circle(x, cy, R)], [rect]));
+      holes.push(circle(x, cy, r));
+      notches.push(circle(x, cy, r + +P.notchClear));
+    }
+  }
+  const withLoops = loops.length ? closing(union(outer, loops), 3) : outer;
+
+  // --- layers
+  let design = union(diff(P.loopsAll ? withLoops : outer, dWin), inter(wood, dWin));
+  design = diff(design, P.loopsAll ? holes : notches);
+  design = CL.Clipper.CleanPolygons(design, 0.005 * SC).filter(p => areaMM2(p) > 0.05);
+  const frame = diff(diff(withLoops, fWin), holes);
+  const glass = offset(fWin, -P.glassClear);
+
+  // --- checks on the design layer
+  const tree = new CL.PolyTree();
+  { const c = new CL.Clipper(); c.AddPaths(design, CL.PolyType.ptSubject, true); c.Execute(CL.ClipType.ctUnion, tree, CL.PolyFillType.pftNonZero, CL.PolyFillType.pftNonZero); }
+  const islands = [];
+  const walk = (node, depth) => {
+    for (const ch of node.Childs()) {
+      if (!ch.IsHole() && depth > 0) islands.push(ch.Contour());
+      walk(ch, ch.IsHole() ? depth : depth + 1);
+    }
+  };
+  walk(tree, 0);
+  let thin = [];
+  if (+P.minWidth > 0) {
+    thin = diff(design, opening(design, +P.minWidth)).filter(p => areaMM2(p) > P.minWidth * P.minWidth * 0.4);
+  }
+  if (islands.length) msgs.push(["warn", `${islands.length} loose piece${islands.length > 1 ? "s" : ""} in the design (shaded red). They are not connected to the border, so you would need to glue them onto the glass. Zoom in so the art touches the border, or use Invert.`]);
+  if (thin.length) msgs.push(["warn", `${thin.length} spot${thin.length > 1 ? "s are" : " is"} thinner than ${P.minWidth} mm (shaded orange) and may break or burn through.`]);
+  const fwb = bounds(fWin);
+  msgs.push(["info", `Glass / acrylic: ${(fwb.w - 2 * P.glassClear).toFixed(1)} × ${(fwb.h - 2 * P.glassClear).toFixed(1)} mm${P.shape === "rect" ? "" : " (use the blue template for the exact shape)"}.`]);
+
+  return { outer, design, frame, glass, islands, thin, msgs, mode, fWin, dWin };
+}
+
+/* ---------------------------------------------------------------- Layout & SVG output */
+const pathD = paths => paths.map(p => "M" + p.map(q => (q.X / SC).toFixed(3) + " " + (q.Y / SC).toFixed(3)).join(" ") + "Z").join("");
+
+function layoutPieces(r) {
+  const pieces = [];
+  if (P.incFront) pieces.push({ name: "Front design", paths: r.design, kind: "cut" });
+  if (P.incFrame) for (let k = 0; k < +P.frameCount; k++) pieces.push({ name: `Frame ${+P.frameCount > 1 ? k + 1 : ""}`.trim(), paths: r.frame, kind: "cut" });
+  if (P.incBack) pieces.push({ name: "Back design", paths: P.mirrorBack ? mirrorX(r.design) : r.design, kind: "cut", mirrored: P.mirrorBack });
+  if (P.incGlass) pieces.push({ name: "Glass", paths: r.glass, kind: "glass" });
+  let x = 0, y = 0, rowH = 0, maxW = 0;
+  for (const pc of pieces) {
+    const b = bounds(pc.paths);
+    if (x > 0 && x + b.w > P.bedWidth) { x = 0; y += rowH + +P.gap; rowH = 0; }
+    pc.dx = x - b.x0; pc.dy = y - b.y0; pc.b = b;
+    x += b.w + +P.gap; rowH = Math.max(rowH, b.h); maxW = Math.max(maxW, x - P.gap);
+  }
+  return { pieces, w: maxW, h: y + rowH };
+}
+
+function exportSVG() {
+  if (!result) return;
+  const L = layoutPieces(result);
+  const W = L.w.toFixed(3), H = L.h.toFixed(3);
+  let body = "";
+  for (const pc of L.pieces) {
+    const color = pc.kind === "glass" ? "#0000ff" : "#ff0000";
+    body += `  <g data-name="${pc.name}">\n    <path fill="none" stroke="${color}" stroke-width="0.1" d="${pathD(translate(pc.paths, pc.dx, pc.dy))}"/>\n  </g>\n`;
+  }
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<!-- Suncatcher Maker: red = cut, blue = glass template -->\n<svg xmlns="http://www.w3.org/2000/svg" width="${W}mm" height="${H}mm" viewBox="0 0 ${W} ${H}">\n${body}</svg>\n`;
+  const blob = new Blob([svg], { type: "image/svg+xml" });
+  const a = document.createElement("a");
+  const base = (art.name || "suncatcher").replace(/\.svg$/i, "").replace(/[^\w\-]+/g, "_");
+  a.href = URL.createObjectURL(blob);
+  a.download = `suncatcher_${base}_${P.width}x${P.height}.svg`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+/* ---------------------------------------------------------------- Rendering */
+function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+function renderPreview(r) {
+  const b = bounds(r.frame.length ? union(r.frame, r.outer) : r.outer);
+  const m = 12;
+  const vb = `${b.x0 - m} ${b.y0 - m} ${b.w + 2 * m} ${b.h + 2 * m}`;
+  const glassCol = P.glass;
+  return `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="tex" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.09" numOctaves="2" seed="4"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 -1.4 1.05"/>
+    </filter>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0.5" dy="0.8" stdDeviation="0.7" flood-color="#000" flood-opacity="0.35"/>
+    </filter>
+    <radialGradient id="glow" cx="45%" cy="35%" r="75%">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.45"/><stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="gclip"><path d="${pathD(r.glass)}"/></clipPath>
+  </defs>
+  <path d="${pathD(r.frame)}" fill="${css("--frame-wood")}" fill-rule="nonzero" stroke="${css("--wood-edge")}" stroke-width="0.25" filter="url(#shadow)"/>
+  <g clip-path="url(#gclip)">
+    <rect x="${b.x0}" y="${b.y0}" width="${b.w}" height="${b.h}" fill="${glassCol}"/>
+    <rect x="${b.x0}" y="${b.y0}" width="${b.w}" height="${b.h}" filter="url(#tex)" opacity="0.35"/>
+    <rect x="${b.x0}" y="${b.y0}" width="${b.w}" height="${b.h}" fill="url(#glow)"/>
+  </g>
+  <path d="${pathD(r.design)}" fill="${css("--wood")}" stroke="${css("--wood-edge")}" stroke-width="0.25" filter="url(#shadow)"/>
+</svg>`;
+}
+
+function renderLayout(r) {
+  const L = layoutPieces(r);
+  if (!L.pieces.length) return `<svg viewBox="0 0 100 40"><text x="50" y="20" text-anchor="middle" font-size="5" fill="${css("--muted")}">Nothing selected for export</text></svg>`;
+  const m = 10;
+  const cut = css("--cut");
+  let g = "";
+  for (const pc of L.pieces) {
+    const flip = pc.mirrored ? (paths => mirrorX(paths)) : (paths => paths);
+    const isDesign = pc.name.includes("design");
+    g += `<g transform="translate(${pc.dx} ${pc.dy})">`;
+    g += `<rect x="${pc.b.x0}" y="${pc.b.y0}" width="${pc.b.w}" height="${pc.b.h}" fill="none" stroke="${css("--line")}" stroke-width="0.3" stroke-dasharray="1.5 1.5"/>`;
+    if (isDesign && r.islands.length) g += `<path d="${pathD(flip(r.islands))}" fill="#ef4444" fill-opacity="0.4"/>`;
+    if (isDesign && r.thin.length) g += `<path d="${pathD(flip(r.thin))}" fill="#f59e0b" fill-opacity="0.75"/>`;
+    g += `<path d="${pathD(pc.paths)}" fill="none" stroke="${pc.kind === "glass" ? "#2563eb" : cut}" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+    g += `<text x="${pc.b.x0}" y="${pc.b.y1 + 6}" font-size="4.2" fill="${css("--muted")}" font-family="system-ui, sans-serif">${pc.name}${pc.mirrored ? " (mirrored)" : ""} · ${pc.b.w.toFixed(1)}×${pc.b.h.toFixed(1)} mm</text>`;
+    g += `</g>`;
+  }
+  return `<svg viewBox="${-m} ${-m} ${L.w + 2 * m} ${L.h + 2 * m + 8}" xmlns="http://www.w3.org/2000/svg">${g}</svg>`;
+}
+
+function render() {
+  const stage = document.getElementById("stage");
+  const busy = document.getElementById("busy");
+  stage.querySelectorAll("svg").forEach(s => s.remove());
+  document.getElementById("layoutLegend").style.display = P.view === "layout" ? "" : "none";
+  document.getElementById("glassSwatches").style.display = P.view === "preview" ? "" : "none";
+  if (!result) return;
+  stage.insertAdjacentHTML("beforeend", P.view === "preview" ? renderPreview(result) : renderLayout(result));
+  stage.appendChild(busy);
+}
+
+function renderStatus(err) {
+  const stats = document.getElementById("stats"), list = document.getElementById("msgs");
+  list.innerHTML = "";
+  if (err) { stats.innerHTML = ""; list.innerHTML = `<li class="bad">${escapeHTML(err)}</li>`; return; }
+  const r = result, L = layoutPieces(r);
+  const cutLen = L.pieces.filter(p => p.kind === "cut").reduce((s, p) => s + perimeterMM(p.paths), 0);
+  stats.innerHTML = `<span>Mode <b>${r.mode === "lines" ? "cut lines" : "silhouette"}</b></span>
+    <span>Sheet <b>${L.w.toFixed(0)} × ${L.h.toFixed(0)} mm</b></span>
+    <span>Parts <b>${L.pieces.length}</b></span>
+    <span>Cut length <b>${(cutLen / 1000).toFixed(2)} m</b></span>`;
+  const all = (art.warnings || []).map(w => ["warn", w]).concat(r.msgs);
+  if (!all.some(m => m[0] === "warn" || m[0] === "bad")) all.unshift(["ok", "✓ No loose pieces or thin spots found."]);
+  list.innerHTML = all.map(([k, t]) => `<li class="${k === "info" ? "ok" : k}">${escapeHTML(t)}</li>`).join("");
+}
+const escapeHTML = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+let timer = null;
+function schedule() {
+  clearTimeout(timer);
+  document.getElementById("busy").classList.add("on");
+  timer = setTimeout(recompute, 120);
+}
+function recompute() {
+  try {
+    result = build();
+    render(); renderStatus();
+  } catch (e) {
+    console.error(e);
+    result = null; render(); renderStatus(e.message || String(e));
+  }
+  document.getElementById("busy").classList.remove("on");
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(P)); } catch (e) {}
+}
+
+/* ---------------------------------------------------------------- UI wiring */
+const NUM_FIELDS = ["zoom", "offX", "offY", "width", "height", "radius", "designBorder", "frameBorder", "glassClear",
+  "loopSpacing", "loopD", "holeD", "loopOut", "notchClear", "minWidth", "bedWidth", "gap"];
+const SELECT_FIELDS = ["rotate", "shape", "frameCount"];
+const CHECK_FIELDS = ["invert", "whiteErase", "useStrokes", "mirrorArt", "stretch", "mirrorBack", "loopsAll", "incFront", "incFrame", "incBack", "incGlass"];
+const SEGS = { modeSeg: "mode", hangSeg: "hang", viewSeg: "view" };
+
+function syncUI() {
+  for (const f of NUM_FIELDS.concat(SELECT_FIELDS)) document.getElementById(f).value = P[f];
+  for (const f of CHECK_FIELDS) document.getElementById(f).checked = !!P[f];
+  for (const [id, key] of Object.entries(SEGS))
+    document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle("on", b.dataset.v === String(P[key])));
+  document.querySelectorAll("#glassSwatches .swatch").forEach(s => s.classList.toggle("on", s.dataset.c === P.glass));
+  document.getElementById("glassPick").value = P.glass;
+  document.getElementById("radius").disabled = P.shape === "ellipse";
+  const auto = art ? art.autoMode : "";
+  document.getElementById("modeHint").textContent = P.mode === "auto" && auto
+    ? (auto === "lines" ? "Detected: cut lines (closed shapes become openings)" : "Detected: silhouette (filled shapes become wood)")
+    : (P.mode === "lines" ? "Closed shapes become openings, like a laser file." : P.mode === "silhouette" ? "Filled shapes become wood; gaps become openings." : "");
+}
+
+function wire() {
+  for (const f of NUM_FIELDS) document.getElementById(f).addEventListener("input", e => {
+    const v = parseFloat(e.target.value); if (isNaN(v)) return;
+    P[f] = v; schedule();
+  });
+  for (const f of SELECT_FIELDS) document.getElementById(f).addEventListener("change", e => {
+    const prevW = P.width;
+    P[f] = e.target.value;
+    if (f === "shape" && e.target.value === "ellipse" && P.hang === "2" && P.loopSpacing > prevW * 0.5) P.loopSpacing = Math.round(prevW * 0.45);
+    syncUI(); schedule();
+  });
+  for (const f of CHECK_FIELDS) document.getElementById(f).addEventListener("change", e => { P[f] = e.target.checked; schedule(); });
+  for (const [id, key] of Object.entries(SEGS)) document.querySelectorAll(`#${id} button`).forEach(b => b.addEventListener("click", () => {
+    P[key] = b.dataset.v; syncUI();
+    if (key === "view") { render(); try { localStorage.setItem(STORE_KEY, JSON.stringify(P)); } catch (e) {} } else schedule();
+  }));
+
+  const sw = document.getElementById("glassSwatches");
+  sw.innerHTML = GLASS_COLORS.map(c => `<button class="swatch" data-c="${c}" style="background:${c}" title="${c}"></button>`).join("")
+    + `<input type="color" id="glassPick" title="Custom colour">`;
+  sw.querySelectorAll(".swatch").forEach(s => s.addEventListener("click", () => { P.glass = s.dataset.c; syncUI(); render(); recomputeSaveOnly(); }));
+  document.getElementById("glassPick").addEventListener("input", e => { P.glass = e.target.value; syncUI(); render(); recomputeSaveOnly(); });
+
+  const drop = document.getElementById("drop"), file = document.getElementById("file");
+  drop.addEventListener("click", () => file.click());
+  drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); file.click(); } });
+  file.addEventListener("change", () => { if (file.files[0]) loadFile(file.files[0]); file.value = ""; });
+  ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
+  document.addEventListener("dragover", e => e.preventDefault());
+  document.addEventListener("drop", e => { e.preventDefault(); const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) loadFile(f); });
+
+  document.getElementById("downloadBtn").addEventListener("click", exportSVG);
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    const keep = { view: P.view, glass: P.glass };
+    P = Object.assign({}, DEFAULTS, keep); syncUI(); schedule();
+  });
+  document.getElementById("themeBtn").addEventListener("click", () => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+    try { localStorage.setItem(STORE_KEY + "-theme", root.dataset.theme); } catch (e) {}
+    render();
+  });
+  try { const t = localStorage.getItem(STORE_KEY + "-theme"); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+}
+function recomputeSaveOnly() { try { localStorage.setItem(STORE_KEY, JSON.stringify(P)); } catch (e) {} }
+
+function loadText(text, name) {
+  try {
+    art = parseArtwork(text, name);
+    document.getElementById("fileName").textContent = name;
+    P.zoom = 100; P.offX = 0; P.offY = 0; P.rotate = "0"; P.mirrorArt = false; P.invert = false; P.mode = "auto";
+    syncUI(); schedule();
+  } catch (e) {
+    renderStatus(e.message || String(e));
+  }
+}
+function loadFile(f) {
+  if (!/svg/i.test(f.type) && !/\.svg$/i.test(f.name)) { renderStatus("Please choose an .svg file."); return; }
+  const rd = new FileReader();
+  rd.onload = () => loadText(rd.result, f.name);
+  rd.readAsText(f);
+}
+
+wire();
+syncUI();
+try { art = parseArtwork(window.SUNCATCHER_DEMO, "Demo: butterfly"); } catch (e) { console.error(e); }
+syncUI();
+recompute();
+</script>
+</body>
+</html>
