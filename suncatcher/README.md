@@ -6,10 +6,10 @@ Open `index.html` in a browser. It works offline, with no build step and no serv
 
 ## How it works
 
-1. **Artwork**: drop in an SVG. The app reads it one of two ways:
+1. **Artwork**: drop in one or more SVGs. Each becomes a layer you can drag in the preview to move it. Use the corner square to resize, the round handle to rotate (Shift snaps to 15°), the scroll wheel to resize and the arrow keys to nudge. Layers apply top to bottom, and you can reorder, duplicate or remove them. Each layer is read one of two ways:
    - **Silhouette**: filled shapes (clip art) become wood. White shapes cut away, and strokes count as wood.
    - **Cut lines**: closed contours become openings, like a laser file such as the butterfly demo.
-   - **Auto** picks one for you. **Invert** swaps wood and openings.
+   - **Auto** picks one for you. **Invert** swaps wood and openings. For example, invert a bat layer to cut it out of a pumpkin above it.
    - **Attach loose pieces to the frame** (on by default) adds wood bridges, so floating art (for example a pumpkin with whitespace around it) stays connected to the border. This includes pieces nested inside other pieces. You can set the bridge width and the number of bridges per piece. Specks under 2 mm² are removed.
 2. **Shape & size**: rounded rectangle, circle/ellipse, arch, hexagon or octagon, in any size.
 3. **Borders & glass**: the glass sits in the frame window. Front and back hold it in place, overlapping it by *design border − frame border*.

@@ -95,7 +95,23 @@ input[type=checkbox] { accent-color: var(--accent); }
 }
 .drop.over, .drop:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .drop b { display: block; margin-bottom: 2px; }
-.filename { font-size: 12px; color: var(--muted); word-break: break-all; margin-top: 4px; }
+.layers { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 4px; }
+.layers li {
+  display: flex; align-items: center; gap: 4px; padding: 5px 6px 5px 10px; border: 1px solid var(--line);
+  border-radius: 8px; cursor: pointer; background: var(--bg);
+}
+.layers li.on { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.layers .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layers small { color: var(--muted); font-size: 11px; }
+.layers button {
+  border: 0; background: transparent; color: var(--muted); cursor: pointer; font: inherit;
+  width: 24px; height: 24px; border-radius: 5px; padding: 0;
+}
+.layers button:hover { background: var(--line); color: var(--ink); }
+.layers button:disabled { opacity: .3; cursor: default; background: transparent; }
+.btnrow { display: flex; gap: 8px; margin: 8px 0; }
+.btnrow .btn { flex: 1; padding: 6px 8px; }
+#layerProps.empty { display: none; }
 .swatches { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .swatch { width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--panel); outline: 1px solid var(--line); cursor: pointer; padding: 0; }
 .swatch.on { outline: 2px solid var(--ink); }
@@ -107,6 +123,10 @@ input[type=color] { width: 30px; height: 26px; border: 0; padding: 0; background
 .toolbar .spacer { flex: 1; }
 .stage { flex: 1; min-height: 0; background: var(--stage); position: relative; overflow: hidden; }
 .stage svg { width: 100%; height: 100%; display: block; }
+.stage.editable svg { touch-action: none; }
+.stage.editable:focus { outline: none; }
+.stage .handle { cursor: nwse-resize; }
+.stage .rot { cursor: grab; }
 .status { padding: 10px 16px; border-top: 1px solid var(--line); background: var(--panel); max-height: 32%; overflow-y: auto; }
 .stats { display: flex; gap: 18px; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
 .stats b { color: var(--ink); font-weight: 600; }
@@ -142,30 +162,32 @@ input[type=color] { width: 30px; height: 26px; border: 0; padding: 0; background
   <details open>
     <summary>1 · Artwork</summary>
     <div class="drop" id="drop" tabindex="0">
-      <b>Drop an SVG here</b>
-      <span class="hint">or click to choose a file</span>
-      <input type="file" id="file" accept=".svg,image/svg+xml" hidden>
+      <b>Drop SVGs here</b>
+      <span class="hint">or click to add (several at once is fine)</span>
+      <input type="file" id="file" accept=".svg,image/svg+xml" multiple hidden>
     </div>
-    <div class="filename" id="fileName">Demo: butterfly</div>
-    <div class="row full">
-      <label>Interpret artwork as</label>
-      <div class="seg" id="modeSeg">
-        <button data-v="auto">Auto</button>
-        <button data-v="silhouette">Silhouette</button>
-        <button data-v="lines">Cut lines</button>
+    <ul class="layers" id="layerList"></ul>
+    <div id="layerProps">
+      <div class="row full">
+        <label>Interpret <b id="selName"></b> as</label>
+        <div class="seg" id="modeSeg">
+          <button data-v="auto">Auto</button>
+          <button data-v="silhouette">Silhouette</button>
+          <button data-v="lines">Cut lines</button>
+        </div>
+        <small id="modeHint"></small>
       </div>
-      <small id="modeHint"></small>
+      <label class="check"><input type="checkbox" id="lInvert"> <span>Invert (swap wood and openings)</span></label>
+      <label class="check"><input type="checkbox" id="lMirror"> <span>Mirror</span></label>
+      <div class="row"><label>Size <small>%</small></label><input type="number" id="lScale" min="5" max="400" step="1"></div>
+      <div class="row"><label>Position X <small>mm</small></label><input type="number" id="lX" step="0.5"></div>
+      <div class="row"><label>Position Y <small>mm</small></label><input type="number" id="lY" step="0.5"></div>
+      <div class="row"><label>Rotation <small>°</small></label><input type="number" id="lAngle" step="1"></div>
+      <div class="btnrow"><button class="btn" id="fitBtn">Fit to window</button><button class="btn" id="centerBtn">Centre</button></div>
     </div>
-    <label class="check"><input type="checkbox" id="invert"> <span>Invert (swap wood and openings)</span></label>
+    <p class="hint">Drag artwork in the preview to move it. Corner square resizes, round handle rotates (Shift snaps to 15°). Scroll to resize, arrow keys nudge, Delete removes.<br>Layers apply top to bottom: tick <b>Invert</b> on a layer to cut it out of the art above it.</p>
     <label class="check"><input type="checkbox" id="whiteErase" checked> <span>White shapes cut away <small>(silhouette)</small></span></label>
     <label class="check"><input type="checkbox" id="useStrokes" checked> <span>Count strokes as wood <small>(silhouette)</small></span></label>
-    <div class="row"><label>Zoom <small>%</small></label><input type="number" id="zoom" min="10" max="400" step="1"></div>
-    <div class="row"><label>Shift X <small>mm</small></label><input type="number" id="offX" step="0.5"></div>
-    <div class="row"><label>Shift Y <small>mm</small></label><input type="number" id="offY" step="0.5"></div>
-    <div class="row"><label>Rotate</label>
-      <select id="rotate"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></div>
-    <label class="check"><input type="checkbox" id="mirrorArt"> <span>Mirror artwork</span></label>
-    <label class="check"><input type="checkbox" id="stretch"> <span>Stretch to fill window <small>(ignore aspect ratio)</small></span></label>
     <label class="check"><input type="checkbox" id="autoBridge"> <span>Attach loose pieces to the frame <small>(adds wood bridges)</small></span></label>
     <div class="row"><label>Bridge width <small>mm</small></label><input type="number" id="bridgeWidth" min="0.5" max="20" step="0.5"></div>
     <div class="row"><label>Bridges per piece</label>
@@ -259,8 +281,7 @@ const SC = 1000;                 // Clipper integer units per mm
 const ARC_TOL = 0.02 * SC;       // max deviation for round offsets (mm * SC)
 
 const DEFAULTS = {
-  mode: "auto", invert: false, whiteErase: true, useStrokes: true,
-  zoom: 100, offX: 0, offY: 0, rotate: "0", mirrorArt: false, stretch: false,
+  whiteErase: true, useStrokes: true,
   autoBridge: true, bridgeWidth: 3, bridgesPer: "2",
   shape: "rect", width: 120, height: 120, radius: 10,
   designBorder: 10, frameBorder: 7.5, glassClear: 0.25, frameCount: "1", mirrorBack: true,
@@ -274,7 +295,12 @@ const STORE_KEY = "suncatcher-maker-v1";
 
 let P = Object.assign({}, DEFAULTS);
 try { Object.assign(P, JSON.parse(localStorage.getItem(STORE_KEY) || "{}")); } catch (e) {}
-let art = null;       // parsed artwork {items, warnings, name}
+// Artwork layers, applied in order: {id, name, text, demo, art, mode, invert, mirror, scale, x, y, angle}
+let layers = [];
+let selId = null;
+let nextId = 1;
+const LAYER_DEFAULTS = { mode: "auto", invert: false, mirror: false, scale: 100, x: 0, y: 0, angle: 0 };
+const selLayer = () => layers.find(L => L.id === selId) || null;
 let result = null;    // last computed geometry
 
 /* ---------------------------------------------------------------- Clipper helpers */
@@ -655,6 +681,88 @@ function connectIslands(design, bw, perPiece) {
   return { design, bridges: all.length ? union(all) : [], count, pieces, specks };
 }
 
+/* ---------------------------------------------------------------- Artwork layers */
+const layerMode = L => (L.mode === "auto" ? L.art.autoMode : L.mode);
+
+// Places one layer in the window: fitted to the window's real shape (convex hull test) at 100 %,
+// then scaled, rotated, mirrored and moved by the layer's own settings.
+function placeLayer(L, dWin, msgs) {
+  const mode = layerMode(L), items = L.art.items;
+  const tag = layers.length > 1 ? `${L.name}: ` : "";
+  // White shapes that only cut away (e.g. a background rectangle) don't count towards the art's size.
+  const erases = light => light && P.whiteErase;
+  const relevant = items.filter(it => mode === "lines" ||
+    (it.fill && !erases(it.fillLight)) || (P.useStrokes && it.stroke && !erases(it.strokeLight)));
+  const pts = [];
+  for (const it of relevant) for (const p of it.paths) {
+    if (mode === "lines" && !p.closed) continue;
+    for (const q of p.pts) pts.push(q);
+  }
+  if (!pts.length) {
+    msgs.push(["warn", tag + (mode === "lines" ? "no closed shapes to use as cut lines. Try Silhouette." : "no filled shapes found. Try Cut lines.")]);
+    return null;
+  }
+  let ax0 = Infinity, ay0 = Infinity, ax1 = -Infinity, ay1 = -Infinity;
+  for (const [x, y] of pts) { ax0 = Math.min(ax0, x); ax1 = Math.max(ax1, x); ay0 = Math.min(ay0, y); ay1 = Math.max(ay1, y); }
+  const aw = Math.max(ax1 - ax0, 1e-6), ah = Math.max(ay1 - ay0, 1e-6);
+  const acx = (ax0 + ax1) / 2, acy = (ay0 + ay1) / 2;
+
+  const wb = bounds(dWin);
+  const cx0 = (wb.x0 + wb.x1) / 2, cy0 = (wb.y0 + wb.y1) / 2;
+  // Silhouette art may reach 1 mm past the window edge so art that is cropped to its edges overlaps the border.
+  const fitArea = mode === "silhouette" ? offset(dWin, 1) : dWin;
+  const fitPoly = fitArea.reduce((a, b) => (areaMM2(b) > areaMM2(a) ? b : a));
+  const s0 = Math.min(wb.w / aw, wb.h / ah);
+  const hull = convexHull(pts.map(([x, y]) => [x - acx, y - acy]));
+  const fits = k => hull.every(([u, v]) => CL.Clipper.PointInPolygon(
+    { X: Math.round((cx0 + u * s0 * k) * SC), Y: Math.round((cy0 + v * s0 * k) * SC) }, fitPoly) !== 0);
+  let lo = 0, hi = 1.5;
+  for (let it = 0; it < 30; it++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; }
+
+  const s = s0 * lo * L.scale / 100, th = L.angle * Math.PI / 180, cs = Math.cos(th), sn = Math.sin(th);
+  const cx = cx0 + L.x, cy = cy0 + L.y;
+  const tf = ([x, y]) => {
+    let u = (x - acx) * s; const v = (y - acy) * s;
+    if (L.mirror) u = -u;
+    return [cx + u * cs - v * sn, cy + u * sn + v * cs];
+  };
+  const toMM = p => toInt(p.pts.map(tf));
+
+  let region, additive;
+  if (mode === "lines") {
+    const contours = [];
+    let open = 0;
+    for (const it of items) for (const p of it.paths) { if (p.closed && p.pts.length > 2) contours.push(toMM(p)); else open++; }
+    if (open) msgs.push(["warn", `${tag}${open} open line${open > 1 ? "s were" : " was"} ignored; only closed shapes become cut-outs.`]);
+    region = CL.Clipper.SimplifyPolygons(contours, CL.PolyFillType.pftEvenOdd);
+    additive = !!L.invert;
+  } else {
+    let acc = [], batch = [];
+    const flush = () => { if (batch.length) { acc = union(acc, batch); batch = []; } };
+    for (const it of items) {
+      if (it.fill) {
+        const closed = it.paths.filter(p => p.pts.length > 2).map(toMM);
+        const reg = CL.Clipper.SimplifyPolygons(closed, it.evenodd ? CL.PolyFillType.pftEvenOdd : CL.PolyFillType.pftNonZero);
+        if (erases(it.fillLight)) { flush(); acc = diff(acc, reg); } else batch.push(...reg);
+      }
+      if (P.useStrokes && it.stroke) {
+        const w = it.strokeWidth * s;
+        if (w > 0.01) {
+          const co = new CL.ClipperOffset(2, ARC_TOL);
+          for (const p of it.paths) co.AddPath(toMM(p), CL.JoinType.jtRound, p.closed ? CL.EndType.etClosedLine : CL.EndType.etOpenRound);
+          const reg = new CL.Paths(); co.Execute(reg, w / 2 * SC);
+          if (erases(it.strokeLight)) { flush(); acc = diff(acc, reg); } else batch.push(...reg);
+        }
+      }
+    }
+    flush();
+    region = acc;
+    additive = !L.invert;
+  }
+  const corners = [[ax0, ay0], [ax1, ay0], [ax1, ay1], [ax0, ay1]].map(tf);
+  return { id: L.id, region, additive, corners, center: [cx, cy] };
+}
+
 /* ---------------------------------------------------------------- Build suncatcher */
 function build() {
   const msgs = [];
@@ -666,84 +774,13 @@ function build() {
   if (+P.frameBorder >= +P.designBorder) msgs.push(["bad", "Frame border must be smaller than the design border, otherwise nothing holds the glass in place."]);
   else if (P.designBorder - P.frameBorder < 1.5) msgs.push(["warn", `The glass is only held by ${(P.designBorder - P.frameBorder).toFixed(1)} mm of overlap; 2 mm or more is safer.`]);
 
-  // --- artwork → mm, fitted to design window
-  const mode = P.mode === "auto" ? art.autoMode : P.mode;
-  const wb = bounds(dWin);
-  // White shapes that only cut away (e.g. a background rectangle) don't count towards the art's size.
-  const erases = light => light && P.whiteErase;
-  const relevant = art.items.filter(it => mode === "lines" ||
-    (it.fill && !erases(it.fillLight)) || (P.useStrokes && it.stroke && !erases(it.strokeLight)));
-  const artPts = [];
-  for (const it of relevant) for (const p of it.paths) {
-    if (mode === "lines" && !p.closed) continue;
-    for (const q of p.pts) artPts.push(q);
-  }
-  if (!artPts.length) throw new Error(mode === "lines" ? "No closed shapes found to use as cut lines. Try Silhouette mode." : "No filled shapes found. Try Cut-lines mode.");
-  let ax0 = Infinity, ay0 = Infinity, ax1 = -Infinity, ay1 = -Infinity;
-  for (const [x, y] of artPts) { ax0 = Math.min(ax0, x); ax1 = Math.max(ax1, x); ay0 = Math.min(ay0, y); ay1 = Math.max(ay1, y); }
-  const rot = +P.rotate, swap = rot === 90 || rot === 270;
-  const aw = Math.max(ax1 - ax0, 1e-6), ah = Math.max(ay1 - ay0, 1e-6);
-  const acx = (ax0 + ax1) / 2, acy = (ay0 + ay1) / 2;
-  const fitW = swap ? ah : aw, fitH = swap ? aw : ah;
-  // Art coordinates centred on the art, after mirror/rotate.
-  const orient = ([x, y]) => {
-    let u = x - acx, v = y - acy;
-    if (P.mirrorArt) u = -u;
-    if (rot === 90) [u, v] = [-v, u]; else if (rot === 180) [u, v] = [-u, -v]; else if (rot === 270) [u, v] = [v, -u];
-    return [u, v];
-  };
-  // Silhouette art may reach 1 mm past the window edge so art that is cropped to its edges overlaps the border.
-  const BLEED = mode === "silhouette" ? 1 : 0;
-  const fitArea = BLEED ? offset(dWin, BLEED) : dWin;
-  let sx = wb.w / fitW, sy = wb.h / fitH;
-  if (!P.stretch) sx = sy = Math.min(sx, sy);
-  const cx0 = (wb.x0 + wb.x1) / 2, cy0 = (wb.y0 + wb.y1) / 2;
-  // Largest scale at which the art's convex hull still fits inside the window's real shape
-  // (octagon, ellipse, arch…), not just its bounding box.
-  const hull = convexHull(artPts.map(orient));
-  const fitPoly = fitArea.reduce((a, b) => (areaMM2(b) > areaMM2(a) ? b : a));
-  const fits = k => hull.every(([u, v]) => CL.Clipper.PointInPolygon(
-    { X: Math.round((cx0 + u * sx * k) * SC), Y: Math.round((cy0 + v * sy * k) * SC) }, fitPoly) !== 0);
-  let lo = 0, hi = 1.5;
-  for (let it = 0; it < 30; it++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; }
-  const z = P.zoom / 100;
-  sx *= lo * z; sy *= lo * z;
-  const wcx = cx0 + +P.offX, wcy = cy0 + +P.offY;
-  const tf = q => { const [u, v] = orient(q); return [wcx + u * sx, wcy + v * sy]; };
-  const sAvg = Math.sqrt(sx * sy);
-  const toMM = p => toInt(p.pts.map(tf));
-
-  let wood; // wood of the artwork, before clipping to the window
-  if (mode === "lines") {
-    const contours = [];
-    let open = 0;
-    for (const it of art.items) for (const p of it.paths) { if (p.closed && p.pts.length > 2) contours.push(toMM(p)); else open++; }
-    if (open) msgs.push(["warn", `${open} open line${open > 1 ? "s were" : " was"} ignored; only closed shapes become cut-outs.`]);
-    const holes = CL.Clipper.SimplifyPolygons(contours, CL.PolyFillType.pftEvenOdd);
-    wood = diff(dWin, holes);
-  } else {
-    let acc = [], batch = [];
-    const flush = () => { if (batch.length) { acc = union(acc, batch); batch = []; } };
-    for (const it of art.items) {
-      if (it.fill) {
-        const closed = it.paths.filter(p => p.pts.length > 2).map(toMM);
-        const reg = CL.Clipper.SimplifyPolygons(closed, it.evenodd ? CL.PolyFillType.pftEvenOdd : CL.PolyFillType.pftNonZero);
-        if (it.fillLight && P.whiteErase) { flush(); acc = diff(acc, reg); } else if (!it.fillLight || !P.whiteErase) batch.push(...reg);
-      }
-      if (P.useStrokes && it.stroke) {
-        const w = it.strokeWidth * sAvg;
-        if (w > 0.01) {
-          const co = new CL.ClipperOffset(2, ARC_TOL);
-          for (const p of it.paths) co.AddPath(toMM(p), CL.JoinType.jtRound, p.closed ? CL.EndType.etClosedLine : CL.EndType.etOpenRound);
-          const reg = new CL.Paths(); co.Execute(reg, w / 2 * SC);
-          if (it.strokeLight && P.whiteErase) { flush(); acc = diff(acc, reg); } else batch.push(...reg);
-        }
-      }
-    }
-    flush();
-    wood = acc;
-  }
-  if (P.invert) wood = diff(dWin, wood);
+  // --- artwork layers → mm. Silhouette layers add wood, cut-line layers cut openings (Invert swaps
+  // that), applied in list order. If the first layer cuts, it cuts into a fully wooden window.
+  const placed = [];
+  for (const L of layers) { const pl = placeLayer(L, dWin, msgs); if (pl) placed.push(pl); }
+  let wood = placed.length && !placed[0].additive ? dWin : [];
+  for (const pl of placed) wood = pl.additive ? union(wood, pl.region) : diff(wood, pl.region);
+  if (!layers.length) msgs.push(["info", "Drop one or more SVGs to add artwork."]);
 
   // --- hangers
   const loops = [], holes = [], notches = [];
@@ -796,12 +833,12 @@ function build() {
   if (+P.minWidth > 0) {
     thin = diff(design, opening(design, +P.minWidth)).filter(p => areaMM2(p) > P.minWidth * P.minWidth * 0.4);
   }
-  if (islands.length) msgs.push(["warn", `${islands.length} loose piece${islands.length > 1 ? "s" : ""} in the design (shaded red). They are not connected to the border, so you would need to glue them onto the glass. Turn on "Attach loose pieces to the frame", zoom in so the art touches the border, or use Invert.`]);
+  if (islands.length) msgs.push(["warn", `${islands.length} loose piece${islands.length > 1 ? "s" : ""} in the design (shaded red). They are not connected to the border, so you would need to glue them onto the glass. Turn on "Attach loose pieces to the frame", make the art bigger so it touches the border, or use Invert.`]);
   if (thin.length) msgs.push(["warn", `${thin.length} spot${thin.length > 1 ? "s are" : " is"} thinner than ${P.minWidth} mm (shaded orange) and may break or burn through.`]);
   const fwb = bounds(fWin);
   msgs.push(["info", `Glass / acrylic: ${(fwb.w - 2 * P.glassClear).toFixed(1)} × ${(fwb.h - 2 * P.glassClear).toFixed(1)} mm${P.shape === "rect" ? "" : " (use the blue template for the exact shape)"}.`]);
 
-  return { outer, design, frame, glass, islands, thin, bridges, msgs, mode, fWin, dWin };
+  return { outer, design, frame, glass, islands, thin, bridges, msgs, placed, fWin, dWin };
 }
 
 /* ---------------------------------------------------------------- Layout & SVG output */
@@ -835,7 +872,7 @@ function exportSVG() {
   const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<!-- Suncatcher Maker: red = cut, blue = glass template -->\n<svg xmlns="http://www.w3.org/2000/svg" width="${W}mm" height="${H}mm" viewBox="0 0 ${W} ${H}">\n${body}</svg>\n`;
   const blob = new Blob([svg], { type: "image/svg+xml" });
   const a = document.createElement("a");
-  const base = (art.name || "suncatcher").replace(/\.svg$/i, "").replace(/[^\w\-]+/g, "_");
+  const base = (layers.length ? layers[0].name : "suncatcher").replace(/\.svg$/i, "").replace(/[^\w\-]+/g, "_");
   a.href = URL.createObjectURL(blob);
   a.download = `suncatcher_${base}_${P.width}x${P.height}.svg`;
   document.body.appendChild(a); a.click(); a.remove();
@@ -871,6 +908,8 @@ function renderPreview(r) {
     <rect x="${b.x0}" y="${b.y0}" width="${b.w}" height="${b.h}" fill="url(#glow)"/>
   </g>
   <path d="${pathD(r.design)}" fill="${css("--wood")}" stroke="${css("--wood-edge")}" stroke-width="0.25" filter="url(#shadow)"/>
+  <g id="ghost"></g>
+  <g id="overlay"></g>
 </svg>`;
 }
 
@@ -902,8 +941,10 @@ function render() {
   document.getElementById("layoutLegend").style.display = P.view === "layout" ? "" : "none";
   document.getElementById("glassSwatches").style.display = P.view === "preview" ? "" : "none";
   if (!result) return;
+  stage.classList.toggle("editable", P.view === "preview");
   stage.insertAdjacentHTML("beforeend", P.view === "preview" ? renderPreview(result) : renderLayout(result));
   stage.appendChild(busy);
+  if (P.view === "preview") drawOverlay();
 }
 
 function renderStatus(err) {
@@ -912,11 +953,11 @@ function renderStatus(err) {
   if (err) { stats.innerHTML = ""; list.innerHTML = `<li class="bad">${escapeHTML(err)}</li>`; return; }
   const r = result, L = layoutPieces(r);
   const cutLen = L.pieces.filter(p => p.kind === "cut").reduce((s, p) => s + perimeterMM(p.paths), 0);
-  stats.innerHTML = `<span>Mode <b>${r.mode === "lines" ? "cut lines" : "silhouette"}</b></span>
+  stats.innerHTML = `<span>Artwork <b>${layers.length} layer${layers.length === 1 ? "" : "s"}</b></span>
     <span>Sheet <b>${L.w.toFixed(0)} × ${L.h.toFixed(0)} mm</b></span>
     <span>Parts <b>${L.pieces.length}</b></span>
     <span>Cut length <b>${(cutLen / 1000).toFixed(2)} m</b></span>`;
-  const all = (art.warnings || []).map(w => ["warn", w]).concat(r.msgs);
+  const all = layers.flatMap(L => (L.art.warnings || []).map(w => ["warn", (layers.length > 1 ? `${L.name}: ` : "") + w])).concat(r.msgs);
   if (!all.some(m => m[0] === "warn" || m[0] === "bad")) all.unshift(["ok", "✓ No loose pieces or thin spots found."]);
   list.innerHTML = all.map(([k, t]) => `<li class="${k === "info" ? "ok" : k}">${escapeHTML(t)}</li>`).join("");
 }
@@ -938,14 +979,249 @@ function recompute() {
   }
   document.getElementById("busy").classList.remove("on");
   try { localStorage.setItem(STORE_KEY, JSON.stringify(P)); } catch (e) {}
+  saveLayers();
+}
+
+/* ---------------------------------------------------------------- Dragging artwork in the preview */
+let drag = null;
+const stageSvg = () => document.querySelector("#stage svg");
+function svgPoint(e) {
+  const svg = stageSvg();
+  return new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM().inverse());
+}
+const placedOf = id => result && result.placed.find(pl => pl.id === id);
+function viewUnit() { const svg = stageSvg(); return svg ? svg.viewBox.baseVal.width / 60 : 2; }
+// Maps a point by the change since the drag started: move by (dx,dy), turn by dth and scale by k about c.
+function applyDelta([x, y], d) {
+  const u = (x - d.c[0]) * d.k, v = (y - d.c[1]) * d.k, cs = Math.cos(d.th), sn = Math.sin(d.th);
+  return [d.c[0] + d.dx + u * cs - v * sn, d.c[1] + d.dy + u * sn + v * cs];
+}
+function currentBox() {
+  const pl = placedOf(selId);
+  if (!pl) return null;
+  if (!drag) return { corners: pl.corners, center: pl.center };
+  return { corners: pl.corners.map(q => applyDelta(q, drag.delta)), center: applyDelta(pl.center, drag.delta) };
+}
+function handlePositions(box) {
+  const h = viewUnit();
+  const [a, b] = box.corners, mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  const ux = mid[0] - box.center[0], uy = mid[1] - box.center[1], ul = Math.hypot(ux, uy) || 1;
+  return { scale: box.corners[2], rotFrom: mid, rot: [mid[0] + ux / ul * h * 3, mid[1] + uy / ul * h * 3], h };
+}
+function drawOverlay() {
+  const g = document.getElementById("overlay");
+  if (!g) return;
+  const box = currentBox();
+  if (!box) { g.innerHTML = ""; return; }
+  const H = handlePositions(box), acc = css("--accent");
+  const poly = box.corners.map(q => q.join(",")).join(" ");
+  g.innerHTML = `<polygon points="${poly}" fill="none" stroke="${acc}" stroke-width="1.5" stroke-dasharray="5 4" vector-effect="non-scaling-stroke" pointer-events="none"/>
+    <line x1="${H.rotFrom[0]}" y1="${H.rotFrom[1]}" x2="${H.rot[0]}" y2="${H.rot[1]}" stroke="${acc}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+    <circle class="rot" cx="${H.rot[0]}" cy="${H.rot[1]}" r="${H.h * 0.7}" fill="#fff" stroke="${acc}" stroke-width="2" vector-effect="non-scaling-stroke"/>
+    <rect class="handle" x="${H.scale[0] - H.h * 0.6}" y="${H.scale[1] - H.h * 0.6}" width="${H.h * 1.2}" height="${H.h * 1.2}" fill="#fff" stroke="${acc}" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+  const ghost = document.getElementById("ghost");
+  if (drag && ghost) {
+    const d = drag.delta;
+    ghost.innerHTML = `<path d="${pathD(placedOf(selId).region)}" fill="${acc}" fill-opacity="0.45" stroke="${acc}" stroke-width="1" vector-effect="non-scaling-stroke"
+      transform="translate(${d.c[0] + d.dx} ${d.c[1] + d.dy}) rotate(${d.th * 180 / Math.PI}) scale(${d.k}) translate(${-d.c[0]} ${-d.c[1]})"/>`;
+  } else if (ghost) ghost.innerHTML = "";
+}
+function insideQuad(pt, q) {
+  let sign = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = q[i], b = q[(i + 1) % 4];
+    const c = (b[0] - a[0]) * (pt[1] - a[1]) - (b[1] - a[1]) * (pt[0] - a[0]);
+    if (c !== 0) { if (sign && Math.sign(c) !== sign) return false; sign = Math.sign(c); }
+  }
+  return true;
+}
+const quadArea = q => Math.abs((q[2][0] - q[0][0]) * (q[3][1] - q[1][1]) - (q[3][0] - q[1][0]) * (q[2][1] - q[0][1])) / 2;
+// Smallest artwork box under the pointer, so small art on top of big art can still be picked.
+function hitLayer(pt) {
+  if (!result) return null;
+  let best = null;
+  for (const pl of result.placed)
+    if (insideQuad(pt, pl.corners) && (!best || quadArea(pl.corners) < quadArea(best.corners))) best = pl;
+  return best;
+}
+function onPointerDown(e) {
+  if (P.view !== "preview" || !result || !stageSvg()) return;
+  const p = svgPoint(e), pt = [p.x, p.y];
+  const box = currentBox();
+  let type = null;
+  if (box) {
+    const H = handlePositions(box);
+    if (Math.hypot(pt[0] - H.rot[0], pt[1] - H.rot[1]) < H.h * 1.3) type = "rotate";
+    else if (Math.hypot(pt[0] - H.scale[0], pt[1] - H.scale[1]) < H.h * 1.3) type = "scale";
+  }
+  if (!type) {
+    const hit = hitLayer(pt);
+    if (!hit) { selId = null; syncLayerUI(); drawOverlay(); return; }
+    if (hit.id !== selId) { selId = hit.id; syncLayerUI(); }
+    type = "move";
+  }
+  const L = selLayer(), pl = placedOf(selId);
+  drag = {
+    type, start: pt, orig: { x: L.x, y: L.y, scale: L.scale, angle: L.angle },
+    a0: Math.atan2(pt[1] - pl.center[1], pt[0] - pl.center[0]),
+    r0: Math.hypot(pt[0] - pl.center[0], pt[1] - pl.center[1]) || 1,
+    delta: { c: pl.center, dx: 0, dy: 0, th: 0, k: 1 },
+  };
+  document.getElementById("stage").focus({ preventScroll: true });
+  e.target.setPointerCapture && stageSvg().setPointerCapture(e.pointerId);
+  e.preventDefault();
+}
+function onPointerMove(e) {
+  if (P.view !== "preview" || !stageSvg()) return;
+  const p = svgPoint(e), pt = [p.x, p.y];
+  if (!drag) {
+    const box = currentBox();
+    let cur = hitLayer(pt) ? "move" : "default";
+    if (box) {
+      const H = handlePositions(box);
+      if (Math.hypot(pt[0] - H.rot[0], pt[1] - H.rot[1]) < H.h * 1.3) cur = "grab";
+      else if (Math.hypot(pt[0] - H.scale[0], pt[1] - H.scale[1]) < H.h * 1.3) cur = "nwse-resize";
+    }
+    stageSvg().style.cursor = cur;
+    return;
+  }
+  const L = selLayer(), d = drag.delta, c = d.c;
+  if (drag.type === "move") {
+    d.dx = pt[0] - drag.start[0]; d.dy = pt[1] - drag.start[1];
+    L.x = round2(drag.orig.x + d.dx); L.y = round2(drag.orig.y + d.dy);
+  } else if (drag.type === "scale") {
+    d.k = Math.max(0.05, Math.hypot(pt[0] - c[0], pt[1] - c[1]) / drag.r0);
+    L.scale = round2(Math.max(5, drag.orig.scale * d.k));
+    d.k = L.scale / drag.orig.scale;
+  } else {
+    let deg = (Math.atan2(pt[1] - c[1], pt[0] - c[0]) - drag.a0) * 180 / Math.PI;
+    let ang = drag.orig.angle + deg;
+    if (e.shiftKey) ang = Math.round(ang / 15) * 15;
+    ang = ((ang % 360) + 540) % 360 - 180;
+    L.angle = round2(ang);
+    d.th = (L.angle - drag.orig.angle) * Math.PI / 180;
+  }
+  syncLayerFields();
+  drawOverlay();
+}
+function onPointerUp() {
+  if (!drag) return;
+  const moved = drag.delta.dx || drag.delta.dy || drag.delta.th || drag.delta.k !== 1;
+  drag = null;
+  if (moved) schedule(); else drawOverlay();
+}
+const round2 = v => Math.round(v * 100) / 100;
+let wheelTimer = null;
+function onWheel(e) {
+  if (P.view !== "preview" || !selLayer() || !stageSvg()) return;
+  const p = svgPoint(e), pl = placedOf(selId);
+  if (!pl || !insideQuad([p.x, p.y], pl.corners)) return;
+  e.preventDefault();
+  const L = selLayer();
+  L.scale = round2(Math.min(400, Math.max(5, L.scale * Math.pow(1.06, -Math.sign(e.deltaY)))));
+  syncLayerFields(); schedule();
+}
+function onKey(e) {
+  if (P.view !== "preview" || !selLayer() || /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) return;
+  const L = selLayer(), st = e.shiftKey ? 5 : 1;
+  const moves = { ArrowLeft: [-st, 0], ArrowRight: [st, 0], ArrowUp: [0, -st], ArrowDown: [0, st] };
+  if (moves[e.key]) { L.x = round2(L.x + moves[e.key][0]); L.y = round2(L.y + moves[e.key][1]); }
+  else if (e.key === "Delete" || e.key === "Backspace") { removeLayer(L.id); }
+  else return;
+  e.preventDefault(); syncLayerUI(); schedule();
+}
+
+/* ---------------------------------------------------------------- Layer list */
+function layerSummary(L) {
+  const m = layerMode(L);
+  return (m === "lines" ? "cut lines" : "silhouette") + (L.invert ? ", inverted" : "");
+}
+function syncLayerFields() {
+  const L = selLayer();
+  if (!L) return;
+  for (const [id, k] of [["lScale", "scale"], ["lX", "x"], ["lY", "y"], ["lAngle", "angle"]]) {
+    const el = document.getElementById(id);
+    if (document.activeElement !== el) el.value = L[k];
+  }
+}
+function syncLayerUI() {
+  const list = document.getElementById("layerList");
+  list.innerHTML = layers.map((L, i) => `<li data-id="${L.id}" class="${L.id === selId ? "on" : ""}">
+    <span class="nm" title="${escapeHTML(L.name)}">${escapeHTML(L.name)}<br><small>${layerSummary(L)}</small></span>
+    <button data-act="up" title="Move up (applied earlier)" ${i === 0 ? "disabled" : ""}>↑</button>
+    <button data-act="down" title="Move down (applied later)" ${i === layers.length - 1 ? "disabled" : ""}>↓</button>
+    <button data-act="dup" title="Duplicate">⧉</button>
+    <button data-act="del" title="Remove">✕</button></li>`).join("");
+  const L = selLayer();
+  document.getElementById("layerProps").classList.toggle("empty", !L);
+  if (!L) return;
+  document.getElementById("selName").textContent = L.name;
+  document.querySelectorAll("#modeSeg button").forEach(b => b.classList.toggle("on", b.dataset.v === L.mode));
+  document.getElementById("lInvert").checked = !!L.invert;
+  document.getElementById("lMirror").checked = !!L.mirror;
+  syncLayerFields();
+  const auto = L.art.autoMode;
+  document.getElementById("modeHint").textContent = L.mode === "auto"
+    ? (auto === "lines" ? "Detected: cut lines (closed shapes become openings)" : "Detected: silhouette (filled shapes become wood)")
+    : (L.mode === "lines" ? "Closed shapes become openings, like a laser file." : "Filled shapes become wood; gaps become openings.");
+}
+function removeLayer(id) {
+  const i = layers.findIndex(L => L.id === id);
+  if (i < 0) return;
+  layers.splice(i, 1);
+  if (selId === id) selId = layers.length ? layers[Math.min(i, layers.length - 1)].id : null;
+}
+function onLayerListClick(e) {
+  const li = e.target.closest("li");
+  if (!li) return;
+  const id = +li.dataset.id, i = layers.findIndex(L => L.id === id);
+  const act = e.target.closest("button") && e.target.closest("button").dataset.act;
+  if (act === "del") removeLayer(id);
+  else if (act === "up" && i > 0) [layers[i - 1], layers[i]] = [layers[i], layers[i - 1]];
+  else if (act === "down" && i < layers.length - 1) [layers[i + 1], layers[i]] = [layers[i], layers[i + 1]];
+  else if (act === "dup") {
+    const L = layers[i], copy = Object.assign({}, L, { id: nextId++, x: L.x + 10, y: L.y + 10 });
+    layers.splice(i + 1, 0, copy); selId = copy.id;
+  } else { selId = id; syncLayerUI(); drawOverlay(); return; }
+  syncLayerUI(); schedule();
+}
+function addLayer(text, name, demo) {
+  const art = parseArtwork(text, name);
+  const first = !layers.length;
+  const L = Object.assign({ id: nextId++, name, text: demo ? null : text, demo: !!demo, art }, LAYER_DEFAULTS,
+    first ? {} : { scale: 50 });
+  layers.push(L);
+  selId = L.id;
+  return L;
+}
+function saveLayers() {
+  try {
+    const data = layers.map(L => ({ name: L.name, demo: L.demo, text: L.demo ? null : L.text,
+      mode: L.mode, invert: L.invert, mirror: L.mirror, scale: L.scale, x: L.x, y: L.y, angle: L.angle }));
+    localStorage.setItem(STORE_KEY + "-layers", JSON.stringify(data));
+  } catch (e) {}
+}
+function restoreLayers() {
+  let data = null;
+  try { data = JSON.parse(localStorage.getItem(STORE_KEY + "-layers") || "null"); } catch (e) {}
+  if (Array.isArray(data)) {
+    for (const d of data) {
+      try {
+        const L = addLayer(d.demo ? window.SUNCATCHER_DEMO : d.text, d.name, d.demo);
+        for (const k of Object.keys(LAYER_DEFAULTS)) if (d[k] !== undefined) L[k] = d[k];
+      } catch (e) { console.error(e); }
+    }
+    if (layers.length || data.length === 0) { selId = layers.length ? layers[0].id : null; return; }
+  }
+  try { addLayer(window.SUNCATCHER_DEMO, "Demo: butterfly", true); } catch (e) { console.error(e); }
 }
 
 /* ---------------------------------------------------------------- UI wiring */
-const NUM_FIELDS = ["zoom", "offX", "offY", "width", "height", "radius", "designBorder", "frameBorder", "glassClear",
+const NUM_FIELDS = ["width", "height", "radius", "designBorder", "frameBorder", "glassClear",
   "loopSpacing", "loopD", "holeD", "loopOut", "notchClear", "minWidth", "bedWidth", "gap", "bridgeWidth"];
-const SELECT_FIELDS = ["rotate", "shape", "frameCount", "bridgesPer"];
-const CHECK_FIELDS = ["invert", "whiteErase", "useStrokes", "mirrorArt", "stretch", "autoBridge", "mirrorBack", "loopsAll", "incFront", "incFrame", "incBack", "incGlass"];
-const SEGS = { modeSeg: "mode", hangSeg: "hang", viewSeg: "view" };
+const SELECT_FIELDS = ["shape", "frameCount", "bridgesPer"];
+const CHECK_FIELDS = ["whiteErase", "useStrokes", "autoBridge", "mirrorBack", "loopsAll", "incFront", "incFrame", "incBack", "incGlass"];
+const SEGS = { hangSeg: "hang", viewSeg: "view" };
 
 function syncUI() {
   for (const f of NUM_FIELDS.concat(SELECT_FIELDS)) document.getElementById(f).value = P[f];
@@ -956,10 +1232,7 @@ function syncUI() {
   document.getElementById("glassPick").value = P.glass;
   document.getElementById("radius").disabled = P.shape === "ellipse";
   document.getElementById("bridgeWidth").disabled = document.getElementById("bridgesPer").disabled = !P.autoBridge;
-  const auto = art ? art.autoMode : "";
-  document.getElementById("modeHint").textContent = P.mode === "auto" && auto
-    ? (auto === "lines" ? "Detected: cut lines (closed shapes become openings)" : "Detected: silhouette (filled shapes become wood)")
-    : (P.mode === "lines" ? "Closed shapes become openings, like a laser file." : P.mode === "silhouette" ? "Filled shapes become wood; gaps become openings." : "");
+  syncLayerUI();
 }
 
 function wire() {
@@ -988,12 +1261,40 @@ function wire() {
   const drop = document.getElementById("drop"), file = document.getElementById("file");
   drop.addEventListener("click", () => file.click());
   drop.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); file.click(); } });
-  file.addEventListener("change", () => { if (file.files[0]) loadFile(file.files[0]); file.value = ""; });
+  file.addEventListener("change", () => { loadFiles(file.files); file.value = ""; });
   ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
   ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
-  drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) loadFile(f); });
   document.addEventListener("dragover", e => e.preventDefault());
-  document.addEventListener("drop", e => { e.preventDefault(); const f = e.dataTransfer && e.dataTransfer.files[0]; if (f) loadFile(f); });
+  document.addEventListener("drop", e => { e.preventDefault(); drop.classList.remove("over"); if (e.dataTransfer) loadFiles(e.dataTransfer.files); });
+
+  document.getElementById("layerList").addEventListener("click", onLayerListClick);
+  document.querySelectorAll("#modeSeg button").forEach(b => b.addEventListener("click", () => {
+    const L = selLayer(); if (!L) return;
+    L.mode = b.dataset.v; syncLayerUI(); schedule();
+  }));
+  for (const [id, k] of [["lInvert", "invert"], ["lMirror", "mirror"]])
+    document.getElementById(id).addEventListener("change", e => { const L = selLayer(); if (!L) return; L[k] = e.target.checked; syncLayerUI(); schedule(); });
+  for (const [id, k] of [["lScale", "scale"], ["lX", "x"], ["lY", "y"], ["lAngle", "angle"]])
+    document.getElementById(id).addEventListener("input", e => {
+      const L = selLayer(), v = parseFloat(e.target.value); if (!L || isNaN(v)) return;
+      L[k] = k === "scale" ? Math.max(1, v) : v; schedule();
+    });
+  document.getElementById("fitBtn").addEventListener("click", () => {
+    const L = selLayer(); if (!L) return;
+    Object.assign(L, { scale: 100, x: 0, y: 0, angle: 0 }); syncLayerUI(); schedule();
+  });
+  document.getElementById("centerBtn").addEventListener("click", () => {
+    const L = selLayer(); if (!L) return;
+    Object.assign(L, { x: 0, y: 0 }); syncLayerUI(); schedule();
+  });
+  const stage = document.getElementById("stage");
+  stage.tabIndex = 0;
+  stage.addEventListener("pointerdown", onPointerDown);
+  stage.addEventListener("pointermove", onPointerMove);
+  stage.addEventListener("pointerup", onPointerUp);
+  stage.addEventListener("pointercancel", onPointerUp);
+  stage.addEventListener("wheel", onWheel, { passive: false });
+  document.addEventListener("keydown", onKey);
 
   document.getElementById("downloadBtn").addEventListener("click", exportSVG);
   document.getElementById("resetBtn").addEventListener("click", () => {
@@ -1011,26 +1312,23 @@ function wire() {
 }
 function recomputeSaveOnly() { try { localStorage.setItem(STORE_KEY, JSON.stringify(P)); } catch (e) {} }
 
-function loadText(text, name) {
-  try {
-    art = parseArtwork(text, name);
-    document.getElementById("fileName").textContent = name;
-    P.zoom = 100; P.offX = 0; P.offY = 0; P.rotate = "0"; P.mirrorArt = false; P.invert = false; P.mode = "auto";
-    syncUI(); schedule();
-  } catch (e) {
-    renderStatus(e.message || String(e));
+async function loadFiles(fileList) {
+  const files = [...(fileList || [])].filter(f => /svg/i.test(f.type) || /\.svg$/i.test(f.name));
+  if (!files.length) { if (fileList && fileList.length) renderStatus("Please choose .svg files."); return; }
+  // The demo makes way for the first real artwork.
+  if (layers.length === 1 && layers[0].demo) layers = [];
+  const errors = [];
+  for (const f of files) {
+    try { addLayer(await f.text(), f.name); } catch (e) { errors.push(`${f.name}: ${e.message || e}`); }
   }
-}
-function loadFile(f) {
-  if (!/svg/i.test(f.type) && !/\.svg$/i.test(f.name)) { renderStatus("Please choose an .svg file."); return; }
-  const rd = new FileReader();
-  rd.onload = () => loadText(rd.result, f.name);
-  rd.readAsText(f);
+  syncUI(); schedule();
+  if (errors.length) setTimeout(() => {
+    document.getElementById("msgs").insertAdjacentHTML("afterbegin", errors.map(t => `<li class="bad">${escapeHTML(t)}</li>`).join(""));
+  }, 400);
 }
 
 wire();
-syncUI();
-try { art = parseArtwork(window.SUNCATCHER_DEMO, "Demo: butterfly"); } catch (e) { console.error(e); }
+restoreLayers();
 syncUI();
 recompute();
 </script>
