@@ -10,6 +10,7 @@ Open `index.html` in a browser. It works offline, with no build step and no serv
    - **Silhouette**: filled shapes (clip art) become wood. White shapes cut away, and strokes count as wood.
    - **Cut lines**: closed contours become openings, like a laser file such as the butterfly demo.
    - **Auto** picks one for you. **Invert** swaps wood and openings.
+   - **Attach loose pieces to the frame** (on by default) adds wood bridges, so floating art (for example a pumpkin with whitespace around it) stays connected to the border. This includes pieces nested inside other pieces. You can set the bridge width and the number of bridges per piece. Specks under 2 mm² are removed.
 2. **Shape & size**: rounded rectangle, circle/ellipse, arch, hexagon or octagon, in any size.
 3. **Borders & glass**: the glass sits in the frame window. Front and back hold it in place, overlapping it by *design border − frame border*.
 4. **Hanger**: none, one loop or two loops on the frame. The design layers get matching notches.

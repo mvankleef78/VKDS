@@ -166,6 +166,10 @@ input[type=color] { width: 30px; height: 26px; border: 0; padding: 0; background
       <select id="rotate"><option value="0">0°</option><option value="90">90°</option><option value="180">180°</option><option value="270">270°</option></select></div>
     <label class="check"><input type="checkbox" id="mirrorArt"> <span>Mirror artwork</span></label>
     <label class="check"><input type="checkbox" id="stretch"> <span>Stretch to fill window <small>(ignore aspect ratio)</small></span></label>
+    <label class="check"><input type="checkbox" id="autoBridge"> <span>Attach loose pieces to the frame <small>(adds wood bridges)</small></span></label>
+    <div class="row"><label>Bridge width <small>mm</small></label><input type="number" id="bridgeWidth" min="0.5" max="20" step="0.5"></div>
+    <div class="row"><label>Bridges per piece</label>
+      <select id="bridgesPer"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select></div>
   </details>
 
   <details open>
@@ -232,7 +236,7 @@ input[type=color] { width: 30px; height: 26px; border: 0; padding: 0; background
       <button data-v="layout">Laser layout</button>
     </div>
     <div class="swatches" id="glassSwatches" title="Glass colour"></div>
-    <span class="legend" id="layoutLegend"><span><i style="background:var(--cut)"></i>cut</span><span><i style="background:#f59e0b88"></i>too thin</span><span><i style="background:#ef444466"></i>loose piece</span></span>
+    <span class="legend" id="layoutLegend"><span><i style="background:var(--cut)"></i>cut</span><span><i style="background:#f59e0b88"></i>too thin</span><span><i style="background:#ef444466"></i>loose piece</span><span><i style="background:#2563eb55"></i>bridge</span></span>
     <span class="spacer"></span>
     <button class="btn primary" id="downloadBtn">Download SVG</button>
   </div>
@@ -257,6 +261,7 @@ const ARC_TOL = 0.02 * SC;       // max deviation for round offsets (mm * SC)
 const DEFAULTS = {
   mode: "auto", invert: false, whiteErase: true, useStrokes: true,
   zoom: 100, offX: 0, offY: 0, rotate: "0", mirrorArt: false, stretch: false,
+  autoBridge: true, bridgeWidth: 3, bridgesPer: "2",
   shape: "rect", width: 120, height: 120, radius: 10,
   designBorder: 10, frameBorder: 7.5, glassClear: 0.25, frameCount: "1", mirrorBack: true,
   hang: "2", loopSpacing: 69.5, loopD: 17.3, holeD: 10, loopOut: 10, notchClear: 0.5, loopsAll: false,
@@ -571,6 +576,75 @@ function parseArtwork(text, name) {
   return { items, warnings, name, autoMode: hasFill ? "silhouette" : "lines" };
 }
 
+/* ---------------------------------------------------------------- Auto-bridging of loose pieces */
+const SPECK_MM2 = 2;
+function polyTree(paths) {
+  const tree = new CL.PolyTree(), c = new CL.Clipper();
+  c.AddPaths(paths, CL.PolyType.ptSubject, true);
+  c.Execute(CL.ClipType.ctUnion, tree, CL.PolyFillType.pftNonZero, CL.PolyFillType.pftNonZero);
+  return tree;
+}
+function resample(path, step) {
+  const out = [], s = step * SC;
+  for (let i = 0; i < path.length; i++) {
+    const a = path[i], b = path[(i + 1) % path.length];
+    const k = Math.max(1, Math.ceil(Math.hypot(b.X - a.X, b.Y - a.Y) / s));
+    for (let j = 0; j < k; j++) out.push([a.X + (b.X - a.X) * j / k, a.Y + (b.Y - a.Y) * j / k]);
+  }
+  return out;
+}
+const BRIDGE_DIRS = [[0, -1], [0, 1], [-1, 0], [1, 0]];
+// Joins every piece that floats inside an opening to the wood around it, using the shortest
+// straight bridge in up to `perPiece` directions (up/down/left/right). Repeats for pieces
+// nested inside other pieces, which become reachable once their parent is attached.
+function connectIslands(design, bw, perPiece) {
+  let all = [], count = 0, pieces = 0, specks = 0;
+  for (let pass = 0; pass < 12; pass++) {
+    const jobs = [], dropped = [];
+    for (const outer of polyTree(design).Childs())
+      for (const hole of outer.Childs())
+        for (const isl of hole.Childs()) {
+          if (areaMM2(isl.Contour()) < SPECK_MM2) dropped.push(isl.Contour());
+          else jobs.push([isl.Contour(), hole.Contour()]);
+        }
+    if (dropped.length) { design = diff(design, dropped); specks += dropped.length; }
+    if (!jobs.length) { if (dropped.length) continue; break; }
+    const segs = [];
+    for (const [isl, target] of jobs) {
+      const ip = resample(isl, 0.8), tp = resample(target, 0.8);
+      const best = BRIDGE_DIRS.map(() => ({ d2: Infinity }));
+      for (const p of ip) for (const q of tp) {
+        const dx = q[0] - p[0], dy = q[1] - p[1], d2 = dx * dx + dy * dy;
+        for (let k = 0; k < 4; k++) {
+          if (d2 >= best[k].d2) continue;
+          const dot = dx * BRIDGE_DIRS[k][0] + dy * BRIDGE_DIRS[k][1];
+          if (dot > 0 && dot * dot >= 0.5 * d2) best[k] = { d2, p, q };
+        }
+      }
+      const cands = best.filter(c => isFinite(c.d2)).sort((a, b) => a.d2 - b.d2);
+      const want = areaMM2(isl) < 25 * bw * bw ? 1 : perPiece;
+      const chosen = [];
+      for (const c of cands) {
+        if (chosen.length >= want) break;
+        if (chosen.some(o => Math.hypot(o.p[0] - c.p[0], o.p[1] - c.p[1]) < 4 * bw * SC)) continue;
+        chosen.push(c);
+      }
+      for (const c of chosen) segs.push([{ X: Math.round(c.p[0]), Y: Math.round(c.p[1]) }, { X: Math.round(c.q[0]), Y: Math.round(c.q[1]) }]);
+      if (chosen.length) pieces++;
+    }
+    if (!segs.length) break;
+    const B = offset(segs, bw / 2, true);
+    // Round off the joints where the bridges meet the art, without touching the rest of the design.
+    const near = offset(B, bw);
+    const local = union(inter(design, offset(B, 2 * bw)), B);
+    const fillet = inter(closing(local, bw), near);
+    design = union(design, union(B, fillet));
+    all = all.concat(B);
+    count += segs.length;
+  }
+  return { design, bridges: all.length ? union(all) : [], count, pieces, specks };
+}
+
 /* ---------------------------------------------------------------- Build suncatcher */
 function build() {
   const msgs = [];
@@ -597,7 +671,9 @@ function build() {
   const acx = (ax0 + ax1) / 2, acy = (ay0 + ay1) / 2;
   const fitW = swap ? ah : aw, fitH = swap ? aw : ah;
   const z = P.zoom / 100;
-  let sx = wb.w / fitW, sy = wb.h / fitH;
+  // Fit 1 mm past the window edge so art that is cropped to its edges overlaps the border.
+  const BLEED = mode === "silhouette" ? 1 : 0;
+  let sx = (wb.w + 2 * BLEED) / fitW, sy = (wb.h + 2 * BLEED) / fitH;
   if (!P.stretch) sx = sy = Math.min(sx, sy);
   sx *= z; sy *= z;
   const wcx = (wb.x0 + wb.x1) / 2 + +P.offX, wcy = (wb.y0 + wb.y1) / 2 + +P.offY;
@@ -668,6 +744,13 @@ function build() {
   let design = union(diff(P.loopsAll ? withLoops : outer, dWin), inter(wood, dWin));
   design = diff(design, P.loopsAll ? holes : notches);
   design = CL.Clipper.CleanPolygons(design, 0.005 * SC).filter(p => areaMM2(p) > 0.05);
+  let bridges = [];
+  if (P.autoBridge) {
+    const res = connectIslands(design, +P.bridgeWidth, +P.bridgesPer);
+    design = res.design; bridges = res.bridges;
+    if (res.count) msgs.push(["info", `Attached ${res.pieces} loose piece${res.pieces > 1 ? "s" : ""} to the frame with ${res.count} bridge${res.count > 1 ? "s" : ""} (blue in the laser layout).`]);
+    if (res.specks) msgs.push(["info", `Removed ${res.specks} tiny speck${res.specks > 1 ? "s" : ""} (under ${SPECK_MM2} mm²) that would fall out.`]);
+  }
   const frame = diff(diff(withLoops, fWin), holes);
   const glass = offset(fWin, -P.glassClear);
 
@@ -686,12 +769,12 @@ function build() {
   if (+P.minWidth > 0) {
     thin = diff(design, opening(design, +P.minWidth)).filter(p => areaMM2(p) > P.minWidth * P.minWidth * 0.4);
   }
-  if (islands.length) msgs.push(["warn", `${islands.length} loose piece${islands.length > 1 ? "s" : ""} in the design (shaded red). They are not connected to the border, so you would need to glue them onto the glass. Zoom in so the art touches the border, or use Invert.`]);
+  if (islands.length) msgs.push(["warn", `${islands.length} loose piece${islands.length > 1 ? "s" : ""} in the design (shaded red). They are not connected to the border, so you would need to glue them onto the glass. Turn on "Attach loose pieces to the frame", zoom in so the art touches the border, or use Invert.`]);
   if (thin.length) msgs.push(["warn", `${thin.length} spot${thin.length > 1 ? "s are" : " is"} thinner than ${P.minWidth} mm (shaded orange) and may break or burn through.`]);
   const fwb = bounds(fWin);
   msgs.push(["info", `Glass / acrylic: ${(fwb.w - 2 * P.glassClear).toFixed(1)} × ${(fwb.h - 2 * P.glassClear).toFixed(1)} mm${P.shape === "rect" ? "" : " (use the blue template for the exact shape)"}.`]);
 
-  return { outer, design, frame, glass, islands, thin, msgs, mode, fWin, dWin };
+  return { outer, design, frame, glass, islands, thin, bridges, msgs, mode, fWin, dWin };
 }
 
 /* ---------------------------------------------------------------- Layout & SVG output */
@@ -776,6 +859,7 @@ function renderLayout(r) {
     g += `<g transform="translate(${pc.dx} ${pc.dy})">`;
     g += `<rect x="${pc.b.x0}" y="${pc.b.y0}" width="${pc.b.w}" height="${pc.b.h}" fill="none" stroke="${css("--line")}" stroke-width="0.3" stroke-dasharray="1.5 1.5"/>`;
     if (isDesign && r.islands.length) g += `<path d="${pathD(flip(r.islands))}" fill="#ef4444" fill-opacity="0.4"/>`;
+    if (isDesign && r.bridges.length) g += `<path d="${pathD(flip(r.bridges))}" fill="#2563eb" fill-opacity="0.35"/>`;
     if (isDesign && r.thin.length) g += `<path d="${pathD(flip(r.thin))}" fill="#f59e0b" fill-opacity="0.75"/>`;
     g += `<path d="${pathD(pc.paths)}" fill="none" stroke="${pc.kind === "glass" ? "#2563eb" : cut}" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
     g += `<text x="${pc.b.x0}" y="${pc.b.y1 + 6}" font-size="4.2" fill="${css("--muted")}" font-family="system-ui, sans-serif">${pc.name}${pc.mirrored ? " (mirrored)" : ""} · ${pc.b.w.toFixed(1)}×${pc.b.h.toFixed(1)} mm</text>`;
@@ -831,9 +915,9 @@ function recompute() {
 
 /* ---------------------------------------------------------------- UI wiring */
 const NUM_FIELDS = ["zoom", "offX", "offY", "width", "height", "radius", "designBorder", "frameBorder", "glassClear",
-  "loopSpacing", "loopD", "holeD", "loopOut", "notchClear", "minWidth", "bedWidth", "gap"];
-const SELECT_FIELDS = ["rotate", "shape", "frameCount"];
-const CHECK_FIELDS = ["invert", "whiteErase", "useStrokes", "mirrorArt", "stretch", "mirrorBack", "loopsAll", "incFront", "incFrame", "incBack", "incGlass"];
+  "loopSpacing", "loopD", "holeD", "loopOut", "notchClear", "minWidth", "bedWidth", "gap", "bridgeWidth"];
+const SELECT_FIELDS = ["rotate", "shape", "frameCount", "bridgesPer"];
+const CHECK_FIELDS = ["invert", "whiteErase", "useStrokes", "mirrorArt", "stretch", "autoBridge", "mirrorBack", "loopsAll", "incFront", "incFrame", "incBack", "incGlass"];
 const SEGS = { modeSeg: "mode", hangSeg: "hang", viewSeg: "view" };
 
 function syncUI() {
@@ -844,6 +928,7 @@ function syncUI() {
   document.querySelectorAll("#glassSwatches .swatch").forEach(s => s.classList.toggle("on", s.dataset.c === P.glass));
   document.getElementById("glassPick").value = P.glass;
   document.getElementById("radius").disabled = P.shape === "ellipse";
+  document.getElementById("bridgeWidth").disabled = document.getElementById("bridgesPer").disabled = !P.autoBridge;
   const auto = art ? art.autoMode : "";
   document.getElementById("modeHint").textContent = P.mode === "auto" && auto
     ? (auto === "lines" ? "Detected: cut lines (closed shapes become openings)" : "Detected: silhouette (filled shapes become wood)")
